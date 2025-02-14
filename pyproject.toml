@@ -16,7 +16,7 @@ dependencies = [
     "scipy",
     "invoke"
 ]
-description = "A set of functions and code to split levels of the game Super Mario Bros. into smaller atomic scenes."
+description = "A set of functions and code to replay games of Super Mario Bros. acquired in the CNeuroMod mario dataset."
 authors = [{name = "Yann Harel"}]
 license = {text = "MIT"}
 
