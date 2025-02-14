@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mario_replays"
+version = "0.1"
+dependencies = [
+    "tqdm",
+    "tqdm_joblib",
+    "pandas",
+    "numpy",
+    "scikit-video",
+    "stable-retro",
+    "joblib",
+    "scipy",
+    "invoke"
+]
+description = "A set of functions and code to split levels of the game Super Mario Bros. into smaller atomic scenes."
+authors = [{name = "Yann Harel"}]
+license = {text = "MIT"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
