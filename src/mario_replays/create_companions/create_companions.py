@@ -24,98 +24,38 @@ from tqdm import tqdm
 import logging
 import skvideo.io
 from PIL import Image
-from mario_replays.utils import replay_bk2, make_mp4
+from mario_replays.utils import replay_bk2, make_mp4, create_sidecar_dict
 
-# ---------------------------
-# UTILITY FUNCTIONS
-# ---------------------------
-def count_kills(repvars):
-    kill_count = 0
-    for i in range(6):
-        for idx, val in enumerate(repvars[f"enemy_kill3{i}"][:-1]):
-            if val in [4, 34, 132]:
-                if repvars[f"enemy_kill3{i}"][idx + 1] != val:
-                    if i == 5:
-                        if repvars["powerup_yes_no"] == 0:
-                            kill_count += 1
-                    else:
-                        kill_count += 1
-    return kill_count
 
-def count_bricks_destroyed(repvars):
-    score_increments = list(np.diff(repvars["score"]))
-    bricks_destroyed = 0
-    for idx, inc in enumerate(score_increments):
-        if inc == 5:
-            if repvars["jump_airborne"][idx] == 1:
-                bricks_destroyed += 1
-    return bricks_destroyed
 
-def count_hits_taken(repvars):
-    diff_state = list(np.diff(repvars["powerstate"]))
-    hits_count = 0
-    for idx, val in enumerate(diff_state):
-        if val < -10000:
-            hits_count += 1
-    diff_lives = list(np.diff(repvars["lives"]))
-    for idx, val in enumerate(diff_lives):
-        if val < 0:
-            hits_count += 1
-    return hits_count
-
-def count_powerups_collected(repvars):
-    powerup_count = 0
-    for idx, val in enumerate(repvars["player_state"][:-1]):
-        if val in [9, 12, 13]:
-            if repvars["player_state"][idx + 1] != val:
-                powerup_count += 1
-    return powerup_count
-
-def create_info_dict(repvars):
-    info_dict = {}
-    info_dict["world"] = repvars["level"][1]
-    info_dict["level"] = repvars["level"][-1]
-    info_dict["duration"] = len(repvars["score"]) / 60
-    info_dict["terminated"] = repvars["terminate"][-1] == True
-    info_dict["cleared"] = all([repvars["terminate"][-1] == True, repvars["lives"][-1] >= 0])
-    info_dict["final_score"] = repvars["score"][-1]
-    info_dict["final_position"] = repvars["xscrollLo"][-1] + (256 * repvars["xscrollHi"][-1])
-    info_dict["lives_lost"] = 2 - repvars["lives"][-1]
-    info_dict["hits_taken"] = count_hits_taken(repvars)
-    info_dict["enemies_killed"] = count_kills(repvars)
-    info_dict["powerups_collected"] = count_powerups_collected(repvars)
-    info_dict["bricks_destroyed"] = count_bricks_destroyed(repvars)
-    info_dict["coins"] = repvars["coins"][-1]
-    return info_dict
-
-def format_repvars(info_list, actions_list, buttons, bk2_file):
+def format_repetition_variables(info_list, actions_list, buttons, bk2_file):
     """
-    Build a repvars dictionary from the collected per-frame info and actions,
+    Build a repetition_variables dictionary from the collected per-frame info and actions,
     plus the list of button names.
     """
-    repvars = {}
+    repetition_variables = {}
     for key in info_list[0].keys():
-        repvars[key] = []
+        repetition_variables[key] = []
     for frame in info_list:
-        for key in repvars.keys():
-            repvars[key].append(frame[key])
+        for key in repetition_variables.keys():
+            repetition_variables[key].append(frame[key])
     for idx, button in enumerate(buttons):
-        repvars[button] = []
+        repetition_variables[button] = []
         for action in actions_list:
-            repvars[button].append(action[idx])
-    repvars["filename"] = bk2_file
+            repetition_variables[button].append(action[idx])
+    repetition_variables["filename"] = bk2_file
     try:
-        repvars["level"] = bk2_file.split("/")[-1].split("_")[-2].split("-")[1]
+        repetition_variables["level"] = bk2_file.split("/")[-1].split("_")[-2].split("-")[1]
     except Exception:
-        repvars["level"] = None
+        repetition_variables["level"] = None
     try:
-        repvars["subject"] = bk2_file.split("/")[-1].split("_")[0]
-        repvars["session"] = bk2_file.split("/")[-1].split("_")[1]
-        repvars["repetition"] = bk2_file.split("/")[-1].split("_")[-1].split(".")[0]
+        repetition_variables["subject"] = bk2_file.split("/")[-1].split("_")[0]
+        repetition_variables["session"] = bk2_file.split("/")[-1].split("_")[1]
+        repetition_variables["repetition"] = bk2_file.split("/")[-1].split("_")[-1].split(".")[0]
     except Exception:
-        repvars["subject"] = repvars["session"] = repvars["repetition"] = None
-    repvars["terminate"] = [True]  # Placeholder for termination info
-    return repvars
+        repetition_variables["subject"] = repetition_variables["session"] = repetition_variables["repetition"] = None
+    repetition_variables["terminate"] = [True]  # Placeholder for termination info
+    return repetition_variables
 
 def get_passage_order(tasks):
     df = pd.DataFrame(tasks, columns=["bk2_file", "bk2_idx", "stimuli_path", "run", "save_video", "save_variables", "save_states"])
@@ -130,9 +70,7 @@ def get_passage_order(tasks):
     df.reset_index(drop=True, inplace=True)
     return list(df.itertuples(index=False, name=None))
 
-# ---------------------------
-# PER-FILE PROCESSING FUNCTION
-# ---------------------------
+
 def process_bk2_file(task, DATA_PATH):
     """
     Process one .bk2 file.
@@ -140,15 +78,17 @@ def process_bk2_file(task, DATA_PATH):
     Parameters:
       task: a tuple (bk2_file, bk2_idx, stimuli_path, run, save_video, save_variables, save_states, total_idx)
     """
-    bk2_file, bk2_idx, stimuli_path, run, save_video, save_variables, save_states, total_idx = task
-    bk2_path = op.join(DATA_PATH, bk2_file)
+    bk2_file, bk2_idx, STIMULI_PATH, run, save_video, save_variables, save_states, total_idx = task
+    bk2_path = op.abspath(op.join(DATA_PATH, bk2_file))
     if bk2_file == "Missing file" or isinstance(bk2_path, float):
         return
     if not op.exists(bk2_path):
         logging.error(f"File not found: {bk2_path}")
         return
 
-    # --- Determine BIDS output folder and filenames ---
+    logging.debug(f"Adding stimuli path: {STIMULI_PATH}")
+    retro.data.Integrations.add_custom_path(STIMULI_PATH)
+
     # Extract subject, session, and run from the bk2 filename.
     base = op.basename(bk2_file)
     parts = base.split("_")
@@ -190,7 +130,7 @@ def process_bk2_file(task, DATA_PATH):
     buttons = None
 
     for frame, keys, annotations, _, actions, state in replay_bk2(
-        bk2_path, skip_first_step=(bk2_idx == 0), stimuli_path=stimuli_path
+        bk2_path, skip_first_step=(bk2_idx == 0)
     ):
         info_list.append(annotations["info"])
         actions_list.append(keys)
@@ -205,10 +145,10 @@ def process_bk2_file(task, DATA_PATH):
         np.savez(npz_file, info=info_list, actions=actions_list)
         logging.info(f"Variables saved to: {npz_file}")
 
-    repvars = format_repvars(info_list, actions_list, buttons, bk2_file)
-    # In case format_repvars did not set these properly, use the ones we extracted.
-    subject = repvars.get("subject", subject)
-    session = repvars.get("session", session)
+    repetition_variables = format_repetition_variables(info_list, actions_list, buttons, bk2_file)
+    # In case format_repetition_variables did not set these properly, use the ones we extracted.
+    subject = repetition_variables.get("subject", subject)
+    session = repetition_variables.get("session", session)
     if not subject.startswith("sub-"):
         subject = "sub-" + str(subject)
     if not session.startswith("ses-"):
@@ -221,7 +161,7 @@ def process_bk2_file(task, DATA_PATH):
     video_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-video.mp4")
     states_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-states.npy")
 
-    info_dict = create_info_dict(repvars)
+    info_dict = create_sidecar_dict(repetition_variables)
     info_dict['bk2_idx'] = bk2_idx
     info_dict['run'] = run
     info_dict['total_idx'] = total_idx
@@ -239,20 +179,30 @@ def process_bk2_file(task, DATA_PATH):
         np.save(states_file, np.array(states_list))
         logging.info(f"States saved to: {states_file}")
 
-# ---------------------------
-# MAIN FUNCTION
-# ---------------------------
-def main(args):
-    # get current path
-    base_absolute_path = op.dirname(op.dirname(op.dirname(op.dirname(op.abspath(__file__)))))
-    DATA_PATH = args.datapath
-    logging.info(f"Generating annotations for the mario dataset in: {DATA_PATH}")
 
-    if args.stimuli is None:
-        stimuli_path = op.join(base_absolute_path, DATA_PATH, "stimuli")
+def main(args):
+        # Set logging level based on --verbose flag.
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
     else:
-        stimuli_path = op.join(args.stimuli)
-    logging.info(f"Using stimuli path: {stimuli_path}")
+        logging.basicConfig(level=logging.WARNING, format="%(message)s")
+
+        # Get datapath
+    DATA_PATH = op.abspath(args.datapath)
+
+
+    # Setup OUTPUT folder
+    if args.output is None:
+        OUTPUT_FOLDER = op.abspath(op.join(DATA_PATH, "derivatives"))
+    else:
+        OUTPUT_FOLDER = op.abspath(args.output)
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    # Integrate game
+    if args.stimuli is None:
+        STIMULI_PATH = op.abspath(op.join(DATA_PATH, "stimuli"))
+    else:
+        STIMULI_PATH = op.abspath(args.stimuli)
 
     tasks = []
     for root, folders, files in sorted(os.walk(DATA_PATH)):
@@ -276,7 +226,7 @@ def main(args):
                                 (
                                     bk2_file,
                                     bk2_idx,
-                                    stimuli_path,
+                                    STIMULI_PATH,
                                     run,
                                     args.save_video,
                                     args.save_variables,
@@ -313,9 +263,15 @@ if __name__ == "__main__":
         type=str,
         help="Data path to look for the stimuli files (rom, state files, data.json etc...).",
     )
-    # Default n_jobs is -1 (use all available cores)
     parser.add_argument(
-        "-j",
+        "-o",
+        "--output",
+        default=None,
+        type=str,
+        help="Path to the derivatives folder, where the outputs will be saved.",
+    )
+    parser.add_argument(
+        "-nj",
         "--n_jobs",
         default=-1,
         type=int,
@@ -344,12 +300,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    # Set logging level based on --verbose flag.
-    if args.verbose:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
-    else:
-        logging.basicConfig(level=logging.WARNING, format="%(message)s")
     
     # Main loop
     main(args)

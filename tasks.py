@@ -8,12 +8,7 @@ BASE_DIR = op.dirname(op.abspath(__file__))
 # ===============================
 
 @task
-def generate_files(c):
-    """Generates files."""
-    c.run(f"python {BASE_DIR}/src/mario_replays/generate_files/generate_files.py -d data/mario")
-
-@task
-def set_mario_dataset(c):
+def setup_mario_dataset(c):
     """Sets up the Mario dataset."""
     command = (
         "mkdir -p data && "
@@ -23,13 +18,19 @@ def set_mario_dataset(c):
         "git checkout events && "
         "datalad get */*/*/*.bk2 && "
         "datalad get */*/*/*.tsv &&"
-        "rm -rf stimuli && "
+        "rm -rf stimuli && " ### the following part is to be removed after mario.stimuli is updated
         "datalad install git@github.com:courtois-neuromod/mario.stimuli stimuli && "
         "cd stimuli && "
         "git checkout scenes_states && "
         "datalad get ."
     )
     c.run(command)
+
+@task
+def create_companions(c):
+    """Generates files."""
+    c.run(f"python {BASE_DIR}/src/mario_replays/create_companions/create_companions.py -d data/mario")
+
 
 
 # ===============================
@@ -41,3 +42,10 @@ def setup_env(c):
     """Sets up the virtual environment and installs dependencies."""
     c.run("pip install -r requirements.txt")
     c.run("pip install -e .")
+
+@task
+def full_pipeine(c):
+    """Runs the full pipeline."""
+    c.run("invoke setup-env")
+    c.run("invoke setup-mario-dataset")
+    c.run("invoke create-companions")
