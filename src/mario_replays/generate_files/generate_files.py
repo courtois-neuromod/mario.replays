@@ -24,63 +24,7 @@ from tqdm import tqdm
 import logging
 import skvideo.io
 from PIL import Image
-
-# ---------------------------
-# PARSER ARGUMENTS
-# ---------------------------
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-d",
-    "--datapath",
-    default=".",
-    type=str,
-    help="Data path to look for events.tsv and .bk2 files. Should be the root of the mario dataset.",
-)
-parser.add_argument(
-    "-s",
-    "--stimuli",
-    default=None,
-    type=str,
-    help="Data path to look for the stimuli files (rom, state files, data.json etc...).",
-)
-# Default n_jobs is -1 (use all available cores)
-parser.add_argument(
-    "-j",
-    "--n_jobs",
-    default=-1,
-    type=int,
-    help="Number of parallel jobs to run. Use -1 to use all available cores.",
-)
-parser.add_argument(
-    "--save_video",
-    action="store_true",
-    help="Save the playback video file (.mp4).",
-)
-parser.add_argument(
-    "--save_variables",
-    action="store_true",
-    help="Save the variables file (.npz) that contains game variables.",
-)
-parser.add_argument(
-    "--save_states",
-    action="store_true",
-    help="Save full RAM state at each frame into a *_states.npy file.",
-)
-parser.add_argument(
-    "-v",
-    "--verbose",
-    action="store_true",
-    help="Display verbose output.",
-)
-
-args = parser.parse_args()
-
-# Set logging level based on --verbose flag.
-if args.verbose:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-else:
-    logging.basicConfig(level=logging.WARNING, format="%(message)s")
-
+from mario_replays.utils import replay_bk2, make_mp4
 
 # ---------------------------
 # UTILITY FUNCTIONS
@@ -173,34 +117,6 @@ def format_repvars(info_list, actions_list, buttons, bk2_file):
     repvars["terminate"] = [True]  # Placeholder for termination info
     return repvars
 
-
-def replay_bk2(
-    bk2_path, skip_first_step=True, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
-):
-    """Create an iterator that replays a bk2 file, yielding frame, keys, annotations, sound, actions, and state."""
-    import logging
-    movie = retro.Movie(bk2_path)
-    if game is None:
-        game = movie.get_game()
-    logging.debug(f"Creating emulator for game: {game}")
-    emulator = retro.make(game, scenario=scenario, inttype=inttype, render_mode=False)
-    emulator.initial_state = movie.get_state()
-    actions = emulator.buttons
-    emulator.reset()
-    if skip_first_step:
-        movie.step()
-    while movie.step():
-        keys = []
-        for p in range(movie.players):
-            for i in range(emulator.num_buttons):
-                keys.append(movie.get_key(i, p))
-        frame, rew, terminate, truncate, info = emulator.step(keys)
-        annotations = {"reward": rew, "done": terminate, "info": info}
-        state = emulator.em.get_state()
-        yield frame, keys, annotations, None, actions, state
-    emulator.close()
-    movie.close()
-
 def get_passage_order(tasks):
     df = pd.DataFrame(tasks, columns=["bk2_file", "bk2_idx", "stimuli_path", "run", "save_video", "save_variables", "save_states"])
     df['subject'] = df['bk2_file'].str.extract(r'sub-(\d+)').astype(int)
@@ -214,107 +130,129 @@ def get_passage_order(tasks):
     df.reset_index(drop=True, inplace=True)
     return list(df.itertuples(index=False, name=None))
 
-
-def make_mp4(selected_frames, movie_fname):
-    """Create an MP4 file from a list of frames."""
-    writer = skvideo.io.FFmpegWriter(
-        movie_fname, inputdict={"-r": "60"}, outputdict={"-r": "60"}
-    )
-    for frame in selected_frames:
-        im = Image.new("RGB", (frame.shape[1], frame.shape[0]), color="white")
-        im.paste(Image.fromarray(frame), (0, 0))
-        writer.writeFrame(np.array(im))
-    writer.close()
-
 # ---------------------------
 # PER-FILE PROCESSING FUNCTION
 # ---------------------------
-def process_bk2_file(task):
+def process_bk2_file(task, DATA_PATH):
     """
     Process one .bk2 file.
 
     Parameters:
-      task: a tuple (bk2_file, bk2_idx, stimuli_path, save_video, save_variables, save_states)
+      task: a tuple (bk2_file, bk2_idx, stimuli_path, run, save_video, save_variables, save_states, total_idx)
     """
     bk2_file, bk2_idx, stimuli_path, run, save_video, save_variables, save_states, total_idx = task
-
-    if bk2_file == "Missing file" or isinstance(bk2_file, float):
+    bk2_path = op.join(DATA_PATH, bk2_file)
+    if bk2_file == "Missing file" or isinstance(bk2_path, float):
         return
-    if not op.exists(bk2_file):
-        logging.error(f"File not found: {bk2_file}")
-        return
-    if op.exists(bk2_file.replace(".bk2", ".json")):
-        logging.info(f"Already processed: {bk2_file}")
+    if not op.exists(bk2_path):
+        logging.error(f"File not found: {bk2_path}")
         return
 
+    # --- Determine BIDS output folder and filenames ---
+    # Extract subject, session, and run from the bk2 filename.
+    base = op.basename(bk2_file)
+    parts = base.split("_")
     try:
-        logging.info(f"Processing: {bk2_file}")
-        retro.data.Integrations.add_custom_path(stimuli_path)
+        subject = parts[0]  # e.g., "sub-01"
+        session = parts[1]  # e.g., "ses-01"
+        run_part = parts[-1].replace(".bk2", "")
+        if run_part.startswith("run-"):
+            run_num = int(run_part.split("-")[-1])
+            run_str = f"run-{run_num:02d}"
+        else:
+            run_str = f"run-{int(run):02d}"
+    except Exception:
+        subject = "sub-unknown"
+        session = "ses-unknown"
+        run_str = f"run-{int(run):02d}"
+    # Create the output directory inside DATA_PATH/derivatives/bids/
+    output_dir = op.join(DATA_PATH, "derivatives", "replays", subject, session)
+    os.makedirs(output_dir, exist_ok=True)
+    # Set the output file names using BIDS-like naming.
+    json_sidecar_fname = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-info.json")
+    # Check if already processed.
+    if op.exists(json_sidecar_fname):
+        logging.info(f"Already processed: {json_sidecar_fname}")
+        return
 
-        npz_file = bk2_file.replace(".bk2", ".npz")
-        video_file = bk2_file.replace(".bk2", ".mp4")
+    logging.info(f"Processing: {bk2_path}")
+    
 
-        info_list = []
-        actions_list = []
-        frames_list = [] if save_video else None
-        states_list = [] if save_states else None
-        buttons = None
+    # These file names will be re-used later.
+    npz_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-variables.npz")
+    video_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-video.mp4")
+    states_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-states.npy")
 
-        for frame, keys, annotations, _, actions, state in replay_bk2(
-            bk2_file, skip_first_step=(bk2_idx == 0)
-        ):
-            info_list.append(annotations["info"])
-            actions_list.append(keys)
-            if buttons is None:
-                buttons = actions  # capture the button names
-            if save_video:
-                frames_list.append(frame)
-            if save_states:
-                states_list.append(state)
+    info_list = []
+    actions_list = []
+    frames_list = [] if save_video else None
+    states_list = [] if save_states else None
+    buttons = None
 
-        if save_variables:
-            np.savez(npz_file, info=info_list, actions=actions_list)
-            logging.info(f"Variables saved to: {npz_file}")
-
-        repvars = format_repvars(info_list, actions_list, buttons, bk2_file)
-        info_dict = create_info_dict(repvars)
-        info_dict['bk2_idx'] = bk2_idx
-        info_dict['run'] = run
-        info_dict['total_idx'] = total_idx
-        json_sidecar_fname = bk2_file.replace(".bk2", ".json")
-        with open(json_sidecar_fname, "w") as f:
-            json.dump(info_dict, f)
-        logging.info(f"JSON saved for: {bk2_file}")
-
+    for frame, keys, annotations, _, actions, state in replay_bk2(
+        bk2_path, skip_first_step=(bk2_idx == 0), stimuli_path=stimuli_path
+    ):
+        info_list.append(annotations["info"])
+        actions_list.append(keys)
+        if buttons is None:
+            buttons = actions  # capture the button names
         if save_video:
-            try:
-                make_mp4(frames_list, video_file)
-                logging.info(f"Video saved to: {video_file}")
-            except Exception as e:
-                logging.error(f"Could not write video file {video_file}: {e}")
+            frames_list.append(frame)
         if save_states:
-            states_file = bk2_file.replace(".bk2", "_states.npy")
-            np.save(states_file, np.array(states_list))
-            logging.info(f"States saved to: {states_file}")
+            states_list.append(state)
 
-    except Exception as e:
-        logging.error(f"Exception processing {bk2_file}: {e}")
+    if save_variables:
+        np.savez(npz_file, info=info_list, actions=actions_list)
+        logging.info(f"Variables saved to: {npz_file}")
+
+    repvars = format_repvars(info_list, actions_list, buttons, bk2_file)
+    # In case format_repvars did not set these properly, use the ones we extracted.
+    subject = repvars.get("subject", subject)
+    session = repvars.get("session", session)
+    if not subject.startswith("sub-"):
+        subject = "sub-" + str(subject)
+    if not session.startswith("ses-"):
+        session = "ses-" + str(session)
+    # Rebuild output directory (in case the subject/session info changed).
+    output_dir = op.join(DATA_PATH, "derivatives", "bids", subject, session)
+    os.makedirs(output_dir, exist_ok=True)
+    json_sidecar_fname = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-info.json")
+    npz_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-variables.npz")
+    video_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-video.mp4")
+    states_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-states.npy")
+
+    info_dict = create_info_dict(repvars)
+    info_dict['bk2_idx'] = bk2_idx
+    info_dict['run'] = run
+    info_dict['total_idx'] = total_idx
+    with open(json_sidecar_fname, "w") as f:
+        json.dump(info_dict, f)
+    logging.info(f"JSON saved for: {json_sidecar_fname}")
+
+    if save_video:
+        try:
+            make_mp4(frames_list, video_file)
+            logging.info(f"Video saved to: {video_file}")
+        except Exception as e:
+            logging.error(f"Could not write video file {video_file}: {e}")
+    if save_states:
+        np.save(states_file, np.array(states_list))
+        logging.info(f"States saved to: {states_file}")
 
 # ---------------------------
 # MAIN FUNCTION
 # ---------------------------
 def main(args):
+    # get current path
+    base_absolute_path = op.dirname(op.dirname(op.dirname(op.dirname(op.abspath(__file__)))))
     DATA_PATH = args.datapath
-    if DATA_PATH == ".":
-        logging.info("No data path specified. Searching files in this folder.")
     logging.info(f"Generating annotations for the mario dataset in: {DATA_PATH}")
 
     if args.stimuli is None:
-        stimuli_path = op.join(os.getcwd(), "stimuli")
-        logging.info(f"Using stimuli path: {stimuli_path}")
+        stimuli_path = op.join(base_absolute_path, DATA_PATH, "stimuli")
     else:
         stimuli_path = op.join(args.stimuli)
-        logging.info(f"Using stimuli path: {stimuli_path}")
+    logging.info(f"Using stimuli path: {stimuli_path}")
 
     tasks = []
     for root, folders, files in sorted(os.walk(DATA_PATH)):
@@ -353,10 +291,65 @@ def main(args):
 
     if n_jobs != 1:
         with tqdm_joblib(tqdm(desc="Processing files", total=len(tasks))) as progress_bar:
-            Parallel(n_jobs=n_jobs)(delayed(process_bk2_file)(task) for task in tasks)
+            Parallel(n_jobs=n_jobs)(delayed(process_bk2_file)(task, DATA_PATH) for task in tasks)
     else:
         for task in tqdm(tasks, desc="Processing files"):
-            process_bk2_file(task)
+            process_bk2_file(task, DATA_PATH)
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-d",
+        "--datapath",
+        default="data/mario",
+        type=str,
+        help="Data path to look for events.tsv and .bk2 files. Should be the root of the mario dataset.",
+    )
+    parser.add_argument(
+        "-s",
+        "--stimuli",
+        default=None,
+        type=str,
+        help="Data path to look for the stimuli files (rom, state files, data.json etc...).",
+    )
+    # Default n_jobs is -1 (use all available cores)
+    parser.add_argument(
+        "-j",
+        "--n_jobs",
+        default=-1,
+        type=int,
+        help="Number of parallel jobs to run. Use -1 to use all available cores.",
+    )
+    parser.add_argument(
+        "--save_video",
+        action="store_true",
+        help="Save the playback video file (.mp4).",
+    )
+    parser.add_argument(
+        "--save_variables",
+        action="store_true",
+        help="Save the variables file (.npz) that contains game variables.",
+    )
+    parser.add_argument(
+        "--save_states",
+        action="store_true",
+        help="Save full RAM state at each frame into a *_states.npy file.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Display verbose output.",
+    )
+
+    args = parser.parse_args()
+
+    # Set logging level based on --verbose flag.
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+    else:
+        logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    
+    # Main loop
     main(args)

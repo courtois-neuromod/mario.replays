@@ -8,12 +8,11 @@ version = "0.1"
 dependencies = [
     "tqdm",
     "tqdm_joblib",
-    "pandas",
-    "numpy",
     "scikit-video",
     "stable-retro",
     "joblib",
-    "scipy",
+    "pandas",
+    "Pillow",
     "invoke"
 ]
 description = "A set of functions and code to replay games of Super Mario Bros. acquired in the CNeuroMod mario dataset."
