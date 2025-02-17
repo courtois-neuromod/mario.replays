@@ -29,7 +29,6 @@ def get_variables_from_replay(
         all_info.append(annotations["info"])
         all_frames.append(frame)
 
-    breakpoint()
 
     repetition_variables = reformat_info(all_info, all_keys, bk2_fpath, actions)
 
