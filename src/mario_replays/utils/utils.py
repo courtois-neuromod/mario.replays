@@ -6,6 +6,8 @@ import logging
 import numpy as np
 import logging
 from mario_replays import replay_bk2
+import os
+import pandas as pd
 
 
 # ===============================
@@ -89,6 +91,63 @@ def create_sidecar_dict(repetition_variables):
 # ---------------------------
 # UTILITY FUNCTIONS
 # ---------------------------
+
+def collect_bk2_files(DATA_PATH, subjects=None, sessions=None):
+    """Collect all bk2 files and related information from the dataset."""
+    bk2_files_info = []
+    for root, _, files in sorted(os.walk(DATA_PATH)):
+        # Skip undesired folders
+        if "sourcedata" in root:
+            continue
+
+        for file in files:
+            # Look for events.tsv that are not annotated
+            if "events.tsv" in file and "annotated" not in file:
+                run_events_file = op.join(root, file)
+                logging.info(f"Processing events file: {file}")
+                events_dataframe = pd.read_table(run_events_file)
+                events_dataframe = events_dataframe[events_dataframe['trial_type'] == 'gym-retro_game']
+
+                basename = op.basename(run_events_file)
+                entities = basename.split('_')
+                entities_dict = {}
+                for ent in entities:
+                    if '-' in ent:
+                        key, value = ent.split('-', 1)
+                        entities_dict[key] = value
+
+                sub = entities_dict.get('sub')
+                ses = entities_dict.get('ses')
+                run = entities_dict.get('run')
+
+                if not sub or not ses or not run:
+                    logging.warning(f"Could not extract subject, session, or run from filename {basename}")
+                    continue
+
+                # Apply subject/session filters if specified
+                if subjects and sub not in subjects:
+                    continue
+                if sessions and ses not in sessions:
+                    continue
+
+                # Gather the BK2 paths from the events file
+                bk2_files = events_dataframe['stim_file'].values.tolist()
+                for bk2_idx, bk2_file in enumerate(bk2_files): #### THIS IS A PROBLEM, WRONG BK2_IDX
+                    if bk2_file != "Missing file" and not isinstance(bk2_file, float):
+                        bk2_files_info.append({
+                            'bk2_file': bk2_file,
+                            'bk2_idx': bk2_idx,
+                            'sub': sub,
+                            'ses': ses,
+                            'run': run
+                        })
+
+    return bk2_files_info
+
+# ---------------------------
+# GET GAME STATS
+# ---------------------------
+
 def count_kills(repetition_variables):
     kill_count = 0
     for i in range(6):

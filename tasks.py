@@ -27,9 +27,9 @@ def setup_mario_dataset(c):
     c.run(command)
 
 @task
-def create_companions(c):
+def create_replays(c):
     """Generates files."""
-    c.run(f"python {BASE_DIR}/src/mario_replays/create_companions/create_companions.py -d data/mario")
+    c.run(f"python {BASE_DIR}/src/mario_replays/create_replays/create_replays.py -d data/mario")
 
 
 
@@ -48,4 +48,4 @@ def full_pipeine(c):
     """Runs the full pipeline."""
     c.run("invoke setup-env")
     c.run("invoke setup-mario-dataset")
-    c.run("invoke create-companions")
+    c.run("invoke create-replays")

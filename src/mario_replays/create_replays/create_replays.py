@@ -71,7 +71,7 @@ def get_passage_order(tasks):
     return list(df.itertuples(index=False, name=None))
 
 
-def process_bk2_file(task, DATA_PATH):
+def process_bk2_file(task, DATA_PATH, OUTPUT_FOLDER):
     """
     Process one .bk2 file.
 
@@ -105,11 +105,9 @@ def process_bk2_file(task, DATA_PATH):
         subject = "sub-unknown"
         session = "ses-unknown"
         run_str = f"run-{int(run):02d}"
-    # Create the output directory inside DATA_PATH/derivatives/bids/
-    output_dir = op.join(DATA_PATH, "derivatives", "replays", subject, session)
-    os.makedirs(output_dir, exist_ok=True)
+
     # Set the output file names using BIDS-like naming.
-    json_sidecar_fname = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-info.json")
+    json_sidecar_fname = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-info.json")
     # Check if already processed.
     if op.exists(json_sidecar_fname):
         logging.info(f"Already processed: {json_sidecar_fname}")
@@ -119,9 +117,9 @@ def process_bk2_file(task, DATA_PATH):
     
 
     # These file names will be re-used later.
-    npz_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-variables.npz")
-    video_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-video.mp4")
-    states_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-states.npy")
+    npz_file = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-variables.npz")
+    video_file = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-video.mp4")
+    states_file = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-states.npy")
 
     info_list = []
     actions_list = []
@@ -153,13 +151,14 @@ def process_bk2_file(task, DATA_PATH):
         subject = "sub-" + str(subject)
     if not session.startswith("ses-"):
         session = "ses-" + str(session)
+
     # Rebuild output directory (in case the subject/session info changed).
-    output_dir = op.join(DATA_PATH, "derivatives", "bids", subject, session)
-    os.makedirs(output_dir, exist_ok=True)
-    json_sidecar_fname = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-info.json")
-    npz_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-variables.npz")
-    video_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-video.mp4")
-    states_file = op.join(output_dir, f"{subject}_{session}_{run_str}_desc-states.npy")
+    OUTPUT_FOLDER = op.join(DATA_PATH, "derivatives", "replays", subject, session)
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    json_sidecar_fname = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-info.json")
+    npz_file = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-variables.npz")
+    video_file = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-video.mp4")
+    states_file = op.join(OUTPUT_FOLDER, f"{subject}_{session}_{run_str}_desc-states.npy")
 
     info_dict = create_sidecar_dict(repetition_variables)
     info_dict['bk2_idx'] = bk2_idx
@@ -193,7 +192,7 @@ def main(args):
 
     # Setup OUTPUT folder
     if args.output is None:
-        OUTPUT_FOLDER = op.abspath(op.join(DATA_PATH, "derivatives"))
+        OUTPUT_FOLDER = op.abspath(op.join(DATA_PATH, "derivatives", "replays"))
     else:
         OUTPUT_FOLDER = op.abspath(args.output)
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -241,7 +240,7 @@ def main(args):
 
     if n_jobs != 1:
         with tqdm_joblib(tqdm(desc="Processing files", total=len(tasks))) as progress_bar:
-            Parallel(n_jobs=n_jobs)(delayed(process_bk2_file)(task, DATA_PATH) for task in tasks)
+            Parallel(n_jobs=n_jobs)(delayed(process_bk2_file)(task, DATA_PATH, OUTPUT_FOLDER) for task in tasks)
     else:
         for task in tqdm(tasks, desc="Processing files"):
             process_bk2_file(task, DATA_PATH)
