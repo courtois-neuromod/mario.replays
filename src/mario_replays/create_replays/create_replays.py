@@ -22,9 +22,9 @@ from joblib import Parallel, delayed
 from tqdm_joblib import tqdm_joblib
 from tqdm import tqdm
 import logging
-from mario_replays.utils import make_mp4, create_sidecar_dict
+from mario_replays.utils import make_mp4, create_sidecar_dict, get_variables_from_replay
 from skvideo import io
-
+import gzip
 
 
 def format_repetition_variables(info_list, actions_list, buttons, bk2_file):
@@ -114,9 +114,7 @@ def process_bk2_file(task, args):
 
 
 
-    save_variables = args.save_variables
-    save_videos = args.save_videos
-    save_states = args.save_states
+
 
     bk2_file, run, idx_in_run, phase, subject, session, level, global_idx, level_idx = task
     
@@ -138,10 +136,14 @@ def process_bk2_file(task, args):
 
     logging.info(f"Processing: {bk2_path}")
     
-    # These file names will be re-used later.
-    npz_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-variables.npz"))
+    save_variables = args.save_variables
+    variables_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-variables.npz"))
+    save_videos = args.save_videos
     video_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", ".mp4"))
-    states_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-states.npz"))
+    save_ramdumps = args.save_ramdumps
+    ramdumps_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-ramdumps.npz"))
+    save_states = args.save_states
+    states_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", ".state"))
 
     skip_first_step = (idx_in_run == 0)
 
@@ -155,10 +157,14 @@ def process_bk2_file(task, args):
         make_mp4(replay_frames, video_file)
         logging.info(f"Video saved to: {video_file}")
     if save_states:
-        np.savez(states_file, np.array(replay_states))
+        with gzip.open(states_file, "wb") as fh:
+            fh.write(replay_states[0])
+        logging.info(f"States saved to: {states_file}")
+    if save_ramdumps:
+        np.savez(ramdumps_file, np.array(replay_states))
         logging.info(f"States saved to: {states_file}")
     if save_variables:
-        np.savez(npz_file, repetition_variables=repetition_variables, replay_info=replay_info)
+        np.savez(variables_file, repetition_variables=repetition_variables, replay_info=replay_info)
         logging.info(f"Variables saved to: {npz_file}")
 
 
@@ -273,6 +279,11 @@ if __name__ == "__main__":
         "--save_states",
         action="store_true",
         help="Save full RAM state at each frame into a *_states.npy file.",
+    )
+    parser.add_argument(
+        "--save_ramdumps",
+        action="store_true",
+        help="Save RAM dumps at each frame into a *_ramdumps.npy file.",
     )
     parser.add_argument(
         "--simple",
