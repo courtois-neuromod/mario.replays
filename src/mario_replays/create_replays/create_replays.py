@@ -215,7 +215,6 @@ def main(args):
                             }
                             bk2_list.append(bk2_info)
     bk2_df = pd.DataFrame(bk2_list)
-    breakpoint()
     bk2_df = get_passage_order(bk2_df)
     
     # Process tasks
