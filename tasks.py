@@ -44,7 +44,7 @@ def setup_env(c):
     c.run("pip install -e .")
 
 @task
-def full_pipeine(c):
+def full_pipeline(c):
     """Runs the full pipeline."""
     c.run("invoke setup-env")
     c.run("invoke setup-mario-dataset")
