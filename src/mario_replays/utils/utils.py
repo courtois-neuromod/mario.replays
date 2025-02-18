@@ -1,5 +1,6 @@
 import retro
 import skvideo
+from skvideo import io
 from PIL import Image
 import os.path as op
 import logging
