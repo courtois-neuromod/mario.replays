@@ -22,23 +22,24 @@ def get_variables_from_replay(
     replay = replay_bk2(
         bk2_fpath, skip_first_step=skip_first_step, game=game, scenario=scenario, inttype=inttype
     )
-    all_frames = []
-    all_keys = []
-    all_info = []
+    replay_frames = []
+    replay_keys = []
+    replay_info = []
+    replay_states = []
     annotations = {}
 
-    for frame, keys, annotations, _, actions, _ in replay:
-        all_keys.append(keys)
-        all_info.append(annotations["info"])
-        all_frames.append(frame)
+    for frame, keys, annotations, _, actions, state in replay:
+        replay_keys.append(keys)
+        replay_info.append(annotations["info"])
+        replay_frames.append(frame)
+        replay_states.append(state)
 
-
-    repetition_variables = reformat_info(all_info, all_keys, bk2_fpath, actions)
+    repetition_variables = reformat_info(replay_info, replay_keys, bk2_fpath, actions)
 
     if not annotations.get('done', False):
         logging.warning(f"Done condition not satisfied for {bk2_fpath}. Consider changing skip_first_step.")
 
-    return repetition_variables, all_frames
+    return repetition_variables, replay_info, replay_frames, replay_states
 
 
 def reformat_info(info, keys, bk2_fpath, actions):
@@ -74,19 +75,19 @@ def reformat_info(info, keys, bk2_fpath, actions):
 
 def create_sidecar_dict(repetition_variables):
     sidecar_dict = {}
-    sidecar_dict["world"] = repetition_variables["level"][1]
-    sidecar_dict["level"] = repetition_variables["level"][-1]
-    sidecar_dict["duration"] = len(repetition_variables["score"]) / 60
-    sidecar_dict["terminated"] = repetition_variables["terminate"][-1] == True
-    sidecar_dict["cleared"] = all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
-    sidecar_dict["final_score"] = repetition_variables["score"][-1]
-    sidecar_dict["final_position"] = repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])
-    sidecar_dict["lives_lost"] = 2 - repetition_variables["lives"][-1]
-    sidecar_dict["hits_taken"] = count_hits_taken(repetition_variables)
-    sidecar_dict["enemies_killed"] = count_kills(repetition_variables)
-    sidecar_dict["powerups_collected"] = count_powerups_collected(repetition_variables)
-    sidecar_dict["bricks_destroyed"] = count_bricks_destroyed(repetition_variables)
-    sidecar_dict["coins"] = repetition_variables["coins"][-1]
+    sidecar_dict["World"] = repetition_variables["level"][1]
+    sidecar_dict["Level"] = repetition_variables["level"][-1]
+    sidecar_dict["Duration"] = len(repetition_variables["score"]) / 60
+    sidecar_dict["Terminated"] = repetition_variables["terminate"][-1] == True
+    sidecar_dict["Cleared"] = repetition_variables["lives"][-1] >= 0 #all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
+    sidecar_dict["Final_score"] = repetition_variables["score"][-1]
+    sidecar_dict["Final_position"] = repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])
+    sidecar_dict["Lives_lost"] = 2 - repetition_variables["lives"][-1]
+    sidecar_dict["Hits_taken"] = count_hits_taken(repetition_variables)
+    sidecar_dict["Enemies_killed"] = count_kills(repetition_variables)
+    sidecar_dict["Powerups_collected"] = count_powerups_collected(repetition_variables)
+    sidecar_dict["Bricks_destroyed"] = count_bricks_destroyed(repetition_variables)
+    sidecar_dict["Coins"] = repetition_variables["coins"][-1]
     return sidecar_dict
 
 # ---------------------------
@@ -133,7 +134,7 @@ def collect_bk2_files(DATA_PATH, subjects=None, sessions=None):
 
                 # Gather the BK2 paths from the events file
                 bk2_files = events_dataframe['stim_file'].values.tolist()
-                for bk2_idx, bk2_file in enumerate(bk2_files): #### THIS IS A PROBLEM, WRONG BK2_IDX
+                for bk2_idx, bk2_file in enumerate(bk2_files):
                     if bk2_file != "Missing file" and not isinstance(bk2_file, float):
                         bk2_files_info.append({
                             'bk2_file': bk2_file,

@@ -22,9 +22,9 @@ from joblib import Parallel, delayed
 from tqdm_joblib import tqdm_joblib
 from tqdm import tqdm
 import logging
-from mario_replays.utils import replay_bk2, make_mp4, create_sidecar_dict
+from mario_replays.utils import make_mp4, create_sidecar_dict, get_variables_from_replay
 from skvideo import io
-
+import gzip
 
 
 def format_repetition_variables(info_list, actions_list, buttons, bk2_file):
@@ -88,14 +88,23 @@ def process_bk2_file(task, args):
         # Get datapath
     DATA_PATH = op.abspath(args.datapath)
 
-    # Setup OUTPUT folder
-    if args.output is None:
-        OUTPUT_FOLDER = op.abspath(op.join(DATA_PATH, "derivatives", "replays"))
+        # If user provides --simple, use the simplified ROM
+    # and change pipeline folder name accordingly.
+    if args.simple:
+        args.game_name = 'SuperMarioBrosSimple-Nes'
+        args.output_name = 'replays_simple'
     else:
-        OUTPUT_FOLDER = op.abspath(args.output)
+        args.game_name = 'SuperMarioBros-Nes'
+        args.output_name = 'replays'
+
+    # Setup derivatives folder
+    if args.output is None:
+        OUTPUT_FOLDER = op.abspath(op.join(DATA_PATH, "derivatives", args.output_name))
+    else:
+        OUTPUT_FOLDER = op.abspath(op.join(args.output, args.output_name))
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    # Integrate game
+    # Make suere the game is integrated to stable-retro
     if args.stimuli is None:
         STIMULI_PATH = op.abspath(op.join(DATA_PATH, "stimuli"))
     else:
@@ -103,9 +112,9 @@ def process_bk2_file(task, args):
     logging.debug(f"Adding stimuli path: {STIMULI_PATH}")
     retro.data.Integrations.add_custom_path(STIMULI_PATH)
 
-    save_variables = args.save_variables
-    save_videos = args.save_videos
-    save_states = args.save_states
+
+
+
 
     bk2_file, run, idx_in_run, phase, subject, session, level, global_idx, level_idx = task
     
@@ -127,34 +136,37 @@ def process_bk2_file(task, args):
 
     logging.info(f"Processing: {bk2_path}")
     
-    # These file names will be re-used later.
-    npz_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-variables.npz"))
+    save_variables = args.save_variables
+    variables_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-variables.npz"))
+    save_videos = args.save_videos
     video_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", ".mp4"))
-    states_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-states.npz"))
+    save_ramdumps = args.save_ramdumps
+    ramdumps_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-ramdumps.npz"))
+    save_states = args.save_states
+    states_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", ".state"))
 
-    info_list = []
-    actions_list = []
-    frames_list = [] if save_videos else None
-    states_list = [] if save_states else None
-    buttons = None
+    skip_first_step = (idx_in_run == 0)
 
-    for frame, keys, annotations, _, actions, state in replay_bk2(
-        bk2_path, skip_first_step=(idx_in_run == 0)
-    ):
-        info_list.append(annotations["info"])
-        actions_list.append(keys)
-        if buttons is None:
-            buttons = actions  # capture the button names
-        if save_videos:
-            frames_list.append(frame)
-        if save_states:
-            states_list.append(state)
-
+    repetition_variables, replay_info, replay_frames, replay_states = get_variables_from_replay(
+            op.join(DATA_PATH, bk2_file),
+            skip_first_step=skip_first_step,
+            game=args.game_name,
+            inttype=retro.data.Integrations.CUSTOM_ONLY
+        )
+    if save_videos:
+        make_mp4(replay_frames, video_file)
+        logging.info(f"Video saved to: {video_file}")
+    if save_states:
+        with gzip.open(states_file, "wb") as fh:
+            fh.write(replay_states[0])
+        logging.info(f"States saved to: {states_file}")
+    if save_ramdumps:
+        np.savez(ramdumps_file, np.array(replay_states))
+        logging.info(f"States saved to: {states_file}")
     if save_variables:
-        np.savez(npz_file, info=info_list, actions=actions_list)
+        np.savez(variables_file, repetition_variables=repetition_variables, replay_info=replay_info)
         logging.info(f"Variables saved to: {npz_file}")
 
-    repetition_variables = format_repetition_variables(info_list, actions_list, buttons, bk2_file)
 
     info_dict = create_sidecar_dict(repetition_variables)
     info_dict['idx_in_run'] = idx_in_run
@@ -167,17 +179,6 @@ def process_bk2_file(task, args):
     with open(json_sidecar_fname, "w") as f:
         json.dump(info_dict, f)
     logging.info(f"JSON saved for: {json_sidecar_fname}")
-
-    if save_videos:
-        #try:
-        make_mp4(frames_list, video_file)
-        #    logging.info(f"Video saved to: {video_file}")
-        #except Exception as e:
-        #    logging.error(f"Could not write video file {video_file}: {e}")
-    if save_states:
-        np.savez(states_file, np.array(states_list))
-        logging.info(f"States saved to: {states_file}")
-
 
 def main(args):
         # Set logging level based on --verbose flag.
@@ -278,6 +279,17 @@ if __name__ == "__main__":
         "--save_states",
         action="store_true",
         help="Save full RAM state at each frame into a *_states.npy file.",
+    )
+    parser.add_argument(
+        "--save_ramdumps",
+        action="store_true",
+        help="Save RAM dumps at each frame into a *_ramdumps.npy file.",
+    )
+    parser.add_argument(
+        "--simple",
+        action="store_true",
+        help="If set, use the simplified game version (SuperMarioBrosSimple-Nes) "
+             "and output into 'mario_scenes_simple' subfolder instead of 'mario_scenes'."
     )
     parser.add_argument(
         "-v",
