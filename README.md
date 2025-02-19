@@ -1,6 +1,10 @@
 # Repetition-level gameplay data
 To make gameplay data easily accessible, we provide a set of sidecar files for each ­´*.bk2´ file recorded. These sidecars contain information about frames, RAM states or global metrics for a single repetition. A set of 4 different sidecars is created for each replay : a global info sidecar, a movie sidecar, a framewise info sidecar and a framewise info dict.
 
+
+## Troubleshoot
+- If you have troubles installing the requirements, try to `pip install --upgrade pip` before.
+
 ## Global info
 The global info sidecar contains general informations about a repetition (e.g. Was this repetition succesfully completed by the player ? How many coins/powerups did the player collect ? How many enemies were killed during this repetition ? What was the final player score ?). It is stored as a JSON file, and has the same filename as its source BK2 file.
 
