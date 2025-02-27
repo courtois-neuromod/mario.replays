@@ -78,7 +78,7 @@ def create_sidecar_dict(repetition_variables):
     sidecar_dict["World"] = repetition_variables["level"][1]
     sidecar_dict["Level"] = repetition_variables["level"][-1]
     sidecar_dict["Duration"] = len(repetition_variables["score"]) / 60
-    sidecar_dict["Terminated"] = repetition_variables["terminate"][-1] == True
+    #sidecar_dict["Terminated"] = repetition_variables["terminate"][-1] == True
     sidecar_dict["Cleared"] = repetition_variables["lives"][-1] >= 0 #all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
     sidecar_dict["Final_score"] = repetition_variables["score"][-1]
     sidecar_dict["Final_position"] = repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])
