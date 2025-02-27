@@ -136,7 +136,7 @@ def process_bk2_file(task, args):
         logging.info(f"States saved to: {states_file}")
     if save_variables:
         np.savez(variables_file, repetition_variables=repetition_variables, replay_info=replay_info)
-        logging.info(f"Variables saved to: {npz_file}")
+        logging.info(f"Variables saved to: {variables_file}")
 
 
     info_dict = create_sidecar_dict(repetition_variables)
