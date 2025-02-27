@@ -27,35 +27,6 @@ from skvideo import io
 import gzip
 
 
-def format_repetition_variables(info_list, actions_list, buttons, bk2_file):
-    """
-    Build a repetition_variables dictionary from the collected per-frame info and actions,
-    plus the list of button names.
-    """
-    repetition_variables = {}
-    for key in info_list[0].keys():
-        repetition_variables[key] = []
-    for frame in info_list:
-        for key in repetition_variables.keys():
-            repetition_variables[key].append(frame[key])
-    for idx, button in enumerate(buttons):
-        repetition_variables[button] = []
-        for action in actions_list:
-            repetition_variables[button].append(action[idx])
-    repetition_variables["filename"] = bk2_file
-    try:
-        repetition_variables["level"] = bk2_file.split("/")[-1].split("_")[-2].split("-")[1]
-    except Exception:
-        repetition_variables["level"] = None
-    try:
-        repetition_variables["subject"] = bk2_file.split("/")[-1].split("_")[0]
-        repetition_variables["session"] = bk2_file.split("/")[-1].split("_")[1]
-        repetition_variables["repetition"] = bk2_file.split("/")[-1].split("_")[-1].split(".")[0]
-    except Exception:
-        repetition_variables["subject"] = repetition_variables["session"] = repetition_variables["repetition"] = None
-    repetition_variables["terminate"] = [True]  # Placeholder for termination info
-    return repetition_variables
-
 def get_passage_order(bk2_df):
     """
     Sorts the DataFrame and assigns cumulative indices for global and 
