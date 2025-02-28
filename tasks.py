@@ -44,6 +44,16 @@ def setup_env(c):
     c.run("pip install -e .")
 
 @task
+def setup_env_compute_canada(c):
+    """Sets up the virtual environment and installs dependencies."""
+    c.run("git clone git@github.com:FaramaFoundation/stable-retro")
+    c.run("cd stable-retro")
+    c.run("pip install -e .")
+    c.run("cd ..")
+    c.run("pip install -r requirements.txt")
+    c.run("pip install -e .")
+
+@task
 def full_pipeline(c):
     """Runs the full pipeline."""
     c.run("invoke setup-env")
