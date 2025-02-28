@@ -75,6 +75,7 @@ def reformat_info(info, keys, bk2_fpath, actions):
 
 def create_sidecar_dict(repetition_variables):
     sidecar_dict = {}
+    sidecar_dict["Subject"] = repetition_variables["subject"]
     sidecar_dict["World"] = repetition_variables["level"][1]
     sidecar_dict["Level"] = repetition_variables["level"][-1]
     sidecar_dict["Duration"] = len(repetition_variables["score"]) / 60
