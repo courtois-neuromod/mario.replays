@@ -9,9 +9,7 @@ import logging
 from mario_replays import replay_bk2
 import os
 import pandas as pd
-import subprocess
-import pickle
-import multiprocessing
+
 
 # ===============================
 # 🔹 GAME VARIABLES MANIPULATION
@@ -21,24 +19,9 @@ def get_variables_from_replay(
     bk2_fpath, skip_first_step=True, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
 ):
     """Replay the bk2 file and return game variables and frames."""
-    def run_in_subprocess(func, *args, **kwargs):
-        """Run a function in a subprocess and return the result."""
-        def target(pipe, func, args, kwargs):
-            result = func(*args, **kwargs)
-            pipe.send(pickle.dumps(result))
-            pipe.close()
-
-        parent_conn, child_conn = multiprocessing.Pipe()
-        process = multiprocessing.Process(target=target, args=(child_conn, func, args, kwargs))
-        process.start()
-        result = pickle.loads(parent_conn.recv())
-        process.join()
-        return result
-
-    replay = run_in_subprocess(
-        replay_bk2, bk2_fpath, skip_first_step=skip_first_step, game=game, scenario=scenario, inttype=inttype
+    replay = replay_bk2(
+        bk2_fpath, skip_first_step=skip_first_step, game=game, scenario=scenario, inttype=inttype
     )
-    
     replay_frames = []
     replay_keys = []
     replay_info = []
