@@ -9,18 +9,18 @@ import logging
 from mario_replays import replay_bk2
 import os
 import pandas as pd
-
+from retro.enums import State
 
 # ===============================
 # 🔹 GAME VARIABLES MANIPULATION
 # ===============================
 
 def get_variables_from_replay(
-    bk2_fpath, skip_first_step=True, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
+    bk2_fpath, skip_first_step=True, state=State.DEFAULT, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
 ):
     """Replay the bk2 file and return game variables and frames."""
     replay = replay_bk2(
-        bk2_fpath, skip_first_step=skip_first_step, game=game, scenario=scenario, inttype=inttype
+        bk2_fpath, skip_first_step=skip_first_step, state=state, game=game, scenario=scenario, inttype=inttype
     )
     replay_frames = []
     replay_keys = []

@@ -1,8 +1,9 @@
 import retro
 import logging
+from retro.enums import State
 
 def replay_bk2(
-    bk2_path, skip_first_step=False, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
+    bk2_path, skip_first_step=False, state=State.DEFAULT, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
 ):
     """
     Create an iterator that replays a bk2 file, yielding frame, keys, annotations, sound, actions, and state.
@@ -27,7 +28,7 @@ def replay_bk2(
     if game is None:
         game = movie.get_game()
     logging.debug(f"Creating emulator for game: {game}")
-    emulator = retro.make(game, scenario=scenario, inttype=inttype, render_mode=False)
+    emulator = retro.make(game, state=state, scenario=scenario, inttype=inttype, render_mode=False)
     emulator.initial_state = movie.get_state()
     actions = emulator.buttons
     emulator.reset()
