@@ -14,9 +14,15 @@ git clone git@github.com:courtois-neuromod/mario.replays
 cd mario.replays
 python -m venv env
 source env/bin/activate
+pip install --upgrade pip
 pip install invoke
 pip install datalad
 invoke setup-env
+```
+
+- Setup dataset
+```
+invoke setup-mario-dataset
 ```
 
 
