@@ -1,6 +1,24 @@
 # Repetition-level gameplay data
 To make gameplay data easily accessible, we provide a set of sidecar files for each ­´*.bk2´ file recorded. These sidecars contain information about frames, RAM states or global metrics for a single repetition. A set of 4 different sidecars is created for each replay : a global info sidecar, a movie sidecar, a framewise info sidecar and a framewise info dict.
 
+## Usage
+
+- Download the repository via git : 
+```
+git clone git@github.com:courtois-neuromod/mario.replays
+```
+
+### First time use
+- Create an env and install the package : 
+```
+cd mario.replays
+python -m venv env
+source env/bin/activate
+pip install invoke
+pip install datalad
+invoke setup-env
+```
+
 
 ## Troubleshoot
 - If you have troubles installing the requirements, try to `pip install --upgrade pip` before.

@@ -20,4 +20,4 @@ authors = [{name = "Yann Harel"}]
 license = {text = "MIT"}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["code"]
