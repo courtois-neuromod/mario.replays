@@ -162,8 +162,6 @@ def main(args):
 
     bk2_list = []
     for root, folders, files in sorted(os.walk(DATA_PATH)):
-        if "sourcedata" in root:
-            continue
         for file in files:
             if "events.tsv" in file and "annotated" not in file:
                 run_events_file = op.join(root, file)
@@ -211,7 +209,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d",
         "--datapath",
-        default="data/mario",
+        default="sourcedata/mario",
         type=str,
         help="Data path to look for events.tsv and .bk2 files. Should be the root of the mario dataset.",
     )
