@@ -31,7 +31,7 @@ def setup_mario_dataset(c):
 @task
 def create_replays(c):
     """Generates files."""
-    c.run(f"python {BASE_DIR}/src/mario_replays/create_replays/create_replays.py -d data/mario")
+    c.run(f"python {BASE_DIR}/code/mario_replays/create_replays/create_replays.py -d data/mario")
 
 
 

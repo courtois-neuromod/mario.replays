@@ -25,6 +25,12 @@ invoke setup-env
 invoke setup-mario-dataset
 ```
 
+### Generate summary info
+```
+source env/bin/activate
+python code/mario_replays/create_replays/create_replays.py -d sourcedata/mario -o outputdata/
+```
+
 
 ## Troubleshoot
 - If you have troubles installing the requirements, try to `pip install --upgrade pip` before.
