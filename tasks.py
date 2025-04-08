@@ -11,15 +11,17 @@ BASE_DIR = op.dirname(op.abspath(__file__))
 def setup_mario_dataset(c):
     """Sets up the Mario dataset."""
     command = (
-        "mkdir -p data && "
-        "cd data && "
-        "datalad install git@github.com:courtois-neuromod/mario && "
+        f"source {BASE_DIR}/env/bin/activate && "
+        "mkdir -p sourcedata && "
+        "cd sourcedata && "
+        "datalad install git@github.com:courtois-neuromod/mario && "# get stimuli through submodule #"datalad install -s ria+ssh://elm.criugm.qc.ca/data/neuromod/ria-sequoia#~cneuromod.mario.raw@events mario && "
         "cd mario && "
         "git checkout events && "
         "datalad get */*/*/*.bk2 && "
         "datalad get */*/*/*.tsv &&"
-        "rm -rf stimuli && " ### the following part is to be removed after mario.stimuli is updated
-        "datalad install git@github.com:courtois-neuromod/mario.stimuli stimuli && "
+        "rm -rf stimuli && "
+        "datalad install git@github.com:courtois-neuromod/mario.stimuli && "
+        "mv mario.stimuli stimuli && "
         "cd stimuli && "
         "git checkout scenes_states && "
         "datalad get ."
