@@ -80,15 +80,15 @@ def create_sidecar_dict(repetition_variables):
     sidecar_dict["Level"] = repetition_variables["level"][-1]
     sidecar_dict["Duration"] = len(repetition_variables["score"]) / 60
     #sidecar_dict["Terminated"] = repetition_variables["terminate"][-1] == True
-    sidecar_dict["Cleared"] = repetition_variables["lives"][-1] >= 0 #all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
-    sidecar_dict["Final_score"] = repetition_variables["score"][-1]
-    sidecar_dict["Final_position"] = repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])
-    sidecar_dict["Lives_lost"] = 2 - repetition_variables["lives"][-1]
+    sidecar_dict["Cleared"] = repetition_variables["lives"][-1] - repetition_variables["lives"][0] >= 0 #all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
+    sidecar_dict["ScoreGained"] = repetition_variables["score"][-1] - repetition_variables["score"][0]
+    sidecar_dict["X_Traveled"] = (repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])) - (repetition_variables["xscrollLo"][0] + (256 * repetition_variables["xscrollHi"][0]))
+    sidecar_dict["Lives_lost"] = repetition_variables["lives"][0] - repetition_variables["lives"][-1]
     sidecar_dict["Hits_taken"] = count_hits_taken(repetition_variables)
     sidecar_dict["Enemies_killed"] = count_kills(repetition_variables)
     sidecar_dict["Powerups_collected"] = count_powerups_collected(repetition_variables)
     sidecar_dict["Bricks_destroyed"] = count_bricks_destroyed(repetition_variables)
-    sidecar_dict["Coins"] = repetition_variables["coins"][-1]
+    sidecar_dict["CoinsGained"] = repetition_variables["coins"][-1] - repetition_variables["coins"][0]
     return sidecar_dict
 
 
