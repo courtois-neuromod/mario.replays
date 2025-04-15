@@ -83,10 +83,6 @@ def process_bk2_file(task, args):
     logging.debug(f"Adding stimuli path: {STIMULI_PATH}")
     retro.data.Integrations.add_custom_path(STIMULI_PATH)
 
-
-
-
-
     bk2_file, run, idx_in_run, phase, subject, session, level, global_idx, level_idx = task
     
     bk2_path = op.abspath(op.join(DATA_PATH, bk2_file))
@@ -107,14 +103,13 @@ def process_bk2_file(task, args):
 
     logging.info(f"Processing: {bk2_path}")
     
-    save_variables = args.save_variables
-    variables_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-variables.npz"))
-    save_videos = args.save_videos
-    video_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", ".mp4"))
-    save_ramdumps = args.save_ramdumps
-    ramdumps_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", "_desc-ramdumps.npz"))
-    save_states = args.save_states
-    states_file = op.join(OUTPUT_FOLDER, bk2_file.replace(".bk2", ".state"))
+
+    entities = bk2_file.split('/')[-1].split('.')[0]
+    beh_folder = op.join(OUTPUT_FOLDER, subject, session, 'beh')
+    mp4_fname       = op.join(beh_folder, 'videos', f"{entities}.mp4")
+    ramdump_fname   = op.join(beh_folder, 'ramdumps', f'{entities}.npz')
+    json_fname      = op.join(beh_folder, 'infos', f"{entities}.json")
+    variables_fname = op.join(beh_folder, 'variables', f"{entities}.json")
 
     skip_first_step = (idx_in_run == 0)
 
@@ -124,32 +119,33 @@ def process_bk2_file(task, args):
             game=args.game_name,
             inttype=retro.data.Integrations.CUSTOM_ONLY
         )
-    if save_videos:
-        make_mp4(replay_frames, video_file)
-        logging.info(f"Video saved to: {video_file}")
-    if save_states:
-        with gzip.open(states_file, "wb") as fh:
-            fh.write(replay_states[0])
-        logging.info(f"States saved to: {states_file}")
-    if save_ramdumps:
-        np.savez(ramdumps_file, np.array(replay_states))
-        logging.info(f"States saved to: {states_file}")
-    if save_variables:
-        np.savez(variables_file, repetition_variables=repetition_variables, replay_info=replay_info)
-        logging.info(f"Variables saved to: {variables_file}")
+    
+    if args.save_videos:
+        os.makedirs(os.path.dirname(mp4_fname), exist_ok=True)
+        make_mp4(replay_frames, mp4_fname)
+        logging.info(f"Video saved to: {mp4_fname}")
+    if args.save_ramdumps:
+        os.makedirs(os.path.dirname(ramdump_fname), exist_ok=True)
+        np.savez(ramdump_fname, np.array(replay_states))
+        logging.info(f"States saved to: {ramdump_fname}")
+    if args.save_variables:
+        os.makedirs(os.path.dirname(variables_fname), exist_ok=True)
+        with open(variables_fname, 'w') as f:  # Changed 'wb' to 'w' for text mode
+            json.dump(repetition_variables, f)
 
 
     info_dict = create_sidecar_dict(repetition_variables)
-    info_dict['idx_in_run'] = idx_in_run
-    info_dict['run'] = run
-    info_dict['global_idx'] = global_idx
-    info_dict['level_idx'] = level_idx
-    info_dict['phase'] = phase
-    info_dict['level_fullname'] = level
+    info_dict['IndexInRun'] = idx_in_run
+    info_dict['Run'] = run
+    info_dict['IndexGlobal'] = global_idx
+    info_dict['IndexLevel'] = level_idx
+    info_dict['Phase'] = phase
+    info_dict['LevelFullName'] = level
 
-    with open(json_sidecar_fname, "w") as f:
+    os.makedirs(os.path.dirname(json_fname), exist_ok=True)
+    with open(json_fname, "w") as f:    
         json.dump(info_dict, f)
-    logging.info(f"JSON saved for: {json_sidecar_fname}")
+    logging.info(f"JSON saved for: {json_fname}")
 
 def main(args):
         # Set logging level based on --verbose flag.
