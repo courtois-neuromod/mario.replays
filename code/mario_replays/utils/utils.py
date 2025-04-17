@@ -83,6 +83,7 @@ def create_sidecar_dict(repetition_variables):
     sidecar_dict["Cleared"] = repetition_variables["lives"][-1] - repetition_variables["lives"][0] >= 0 #all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
     sidecar_dict["ScoreGained"] = repetition_variables["score"][-1] - repetition_variables["score"][0]
     sidecar_dict["X_Traveled"] = (repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])) - (repetition_variables["xscrollLo"][0] + (256 * repetition_variables["xscrollHi"][0]))
+    sidecar_dict["Average_speed"] = sidecar_dict["X_Traveled"] / sidecar_dict["Duration"]
     sidecar_dict["Lives_lost"] = repetition_variables["lives"][0] - repetition_variables["lives"][-1]
     sidecar_dict["Hits_taken"] = count_hits_taken(repetition_variables)
     sidecar_dict["Enemies_killed"] = count_kills(repetition_variables)

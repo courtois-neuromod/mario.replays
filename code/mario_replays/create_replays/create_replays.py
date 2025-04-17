@@ -141,6 +141,7 @@ def process_bk2_file(task, args):
     info_dict['IndexLevel'] = level_idx
     info_dict['Phase'] = phase
     info_dict['LevelFullName'] = level
+    info_dict['Bk2File'] = entities
 
     os.makedirs(os.path.dirname(json_fname), exist_ok=True)
     with open(json_fname, "w") as f:    
