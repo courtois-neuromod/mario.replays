@@ -15,12 +15,23 @@ from retro.enums import State
 # 🔹 GAME VARIABLES MANIPULATION
 # ===============================
 
+
 def get_variables_from_replay(
-    bk2_fpath, skip_first_step=True, state=State.DEFAULT, game=None, scenario=None, inttype=retro.data.Integrations.CUSTOM_ONLY
+    bk2_fpath,
+    skip_first_step=True,
+    state=State.DEFAULT,
+    game=None,
+    scenario=None,
+    inttype=retro.data.Integrations.CUSTOM_ONLY,
 ):
     """Replay the bk2 file and return game variables and frames."""
     replay = replay_bk2(
-        bk2_fpath, skip_first_step=skip_first_step, state=state, game=game, scenario=scenario, inttype=inttype
+        bk2_fpath,
+        skip_first_step=skip_first_step,
+        state=state,
+        game=game,
+        scenario=scenario,
+        inttype=inttype,
     )
     replay_frames = []
     replay_keys = []
@@ -36,8 +47,10 @@ def get_variables_from_replay(
 
     repetition_variables = reformat_info(replay_info, replay_keys, bk2_fpath, actions)
 
-    if not annotations.get('done', False):
-        logging.warning(f"Done condition not satisfied for {bk2_fpath}. Consider changing skip_first_step.")
+    if not annotations.get("done", False):
+        logging.warning(
+            f"Done condition not satisfied for {bk2_fpath}. Consider changing skip_first_step."
+        )
 
     return repetition_variables, replay_info, replay_frames, replay_states
 
@@ -45,19 +58,19 @@ def get_variables_from_replay(
 def reformat_info(info, keys, bk2_fpath, actions):
     """Create a structured dictionary from replay info."""
     filename = op.basename(bk2_fpath)
-    entities = filename.split('_')
+    entities = filename.split("_")
     entities_dict = {}
     for ent in entities:
-        if '-' in ent:
-            key, value = ent.split('-', 1)
+        if "-" in ent:
+            key, value = ent.split("-", 1)
             entities_dict[key] = value
 
     repetition_variables = {
         "filename": bk2_fpath,
-        "level": entities_dict.get('level'),
-        "subject": entities_dict.get('sub'),
-        "session": entities_dict.get('ses'),
-        "repetition": entities_dict.get('run'),
+        "level": entities_dict.get("level"),
+        "subject": entities_dict.get("sub"),
+        "session": entities_dict.get("ses"),
+        "repetition": entities_dict.get("run"),
         "actions": actions,
     }
 
@@ -73,29 +86,56 @@ def reformat_info(info, keys, bk2_fpath, actions):
             repetition_variables[button].append(keys[frame_idx][button_idx])
     return repetition_variables
 
+
 def create_sidecar_dict(repetition_variables):
     sidecar_dict = {}
     sidecar_dict["Subject"] = repetition_variables["subject"]
     sidecar_dict["World"] = repetition_variables["level"][1]
     sidecar_dict["Level"] = repetition_variables["level"][-1]
     sidecar_dict["Duration"] = len(repetition_variables["score"]) / 60
-    #sidecar_dict["Terminated"] = repetition_variables["terminate"][-1] == True
-    sidecar_dict["Cleared"] = repetition_variables["lives"][-1] - repetition_variables["lives"][0] >= 0 #all([repetition_variables["terminate"][-1] == True, repetition_variables["lives"][-1] >= 0])
-    sidecar_dict["ScoreGained"] = repetition_variables["score"][-1] - repetition_variables["score"][0]
-    sidecar_dict["X_Traveled"] = (repetition_variables["xscrollLo"][-1] + (256 * repetition_variables["xscrollHi"][-1])) - (repetition_variables["xscrollLo"][0] + (256 * repetition_variables["xscrollHi"][0]))
-    sidecar_dict["Average_speed"] = sidecar_dict["X_Traveled"] / sidecar_dict["Duration"]
-    sidecar_dict["Lives_lost"] = repetition_variables["lives"][0] - repetition_variables["lives"][-1]
+    # sidecar_dict["Terminated"] = repetition_variables["terminate"][-1] == True
+    if repetition_variables["player_y_screen"][-1] > 1:
+        cleared = False
+    elif repetition_variables["lives"][-1] == -1:
+        cleared = False
+    elif repetition_variables["player_state"][-1] == 6:
+        cleared = False
+    elif repetition_variables["player_state"][-1] == 11:
+        cleared = False
+    else:
+        cleared = True
+
+    sidecar_dict["Cleared"] = cleared
+    sidecar_dict["ScoreGained"] = (
+        repetition_variables["score"][-1] - repetition_variables["score"][0]
+    )
+    sidecar_dict["X_Traveled"] = (
+        repetition_variables["xscrollLo"][-1]
+        + (256 * repetition_variables["xscrollHi"][-1])
+    ) - (
+        repetition_variables["xscrollLo"][0]
+        + (256 * repetition_variables["xscrollHi"][0])
+    )
+    sidecar_dict["Average_speed"] = (
+        sidecar_dict["X_Traveled"] / sidecar_dict["Duration"]
+    )
+    sidecar_dict["Lives_lost"] = (
+        repetition_variables["lives"][0] - repetition_variables["lives"][-1]
+    )
     sidecar_dict["Hits_taken"] = count_hits_taken(repetition_variables)
     sidecar_dict["Enemies_killed"] = count_kills(repetition_variables)
     sidecar_dict["Powerups_collected"] = count_powerups_collected(repetition_variables)
     sidecar_dict["Bricks_destroyed"] = count_bricks_destroyed(repetition_variables)
-    sidecar_dict["CoinsGained"] = repetition_variables["coins"][-1] - repetition_variables["coins"][0]
+    sidecar_dict["CoinsGained"] = (
+        repetition_variables["coins"][-1] - repetition_variables["coins"][0]
+    )
     return sidecar_dict
 
 
 # ---------------------------
 # GET GAME STATS
 # ---------------------------
+
 
 def count_kills(repetition_variables):
     kill_count = 0
@@ -110,6 +150,7 @@ def count_kills(repetition_variables):
                         kill_count += 1
     return kill_count
 
+
 def count_bricks_destroyed(repetition_variables):
     score_increments = list(np.diff(repetition_variables["score"]))
     bricks_destroyed = 0
@@ -118,6 +159,7 @@ def count_bricks_destroyed(repetition_variables):
             if repetition_variables["jump_airborne"][idx] == 1:
                 bricks_destroyed += 1
     return bricks_destroyed
+
 
 def count_hits_taken(repetition_variables):
     diff_state = list(np.diff(repetition_variables["powerstate"]))
@@ -131,6 +173,7 @@ def count_hits_taken(repetition_variables):
             hits_count += 1
     return hits_count
 
+
 def count_powerups_collected(repetition_variables):
     powerup_count = 0
     for idx, val in enumerate(repetition_variables["player_state"][:-1]):
@@ -139,9 +182,11 @@ def count_powerups_collected(repetition_variables):
                 powerup_count += 1
     return powerup_count
 
+
 # ===============================
 # 🔹 FILES CREATION
 # ===============================
+
 
 def make_gif(selected_frames, movie_fname):
     """Create a GIF file from a list of frames."""
@@ -152,7 +197,12 @@ def make_gif(selected_frames, movie_fname):
         return
 
     frame_list[0].save(
-        movie_fname, save_all=True, append_images=frame_list[1:], optimize=False, duration=16, loop=0
+        movie_fname,
+        save_all=True,
+        append_images=frame_list[1:],
+        optimize=False,
+        duration=16,
+        loop=0,
     )
 
 
@@ -177,6 +227,12 @@ def make_webp(selected_frames, movie_fname):
         return
 
     frame_list[0].save(
-        movie_fname, 'WEBP', quality=50, lossless=False, save_all=True, append_images=frame_list[1:], duration=16, loop=0
+        movie_fname,
+        "WEBP",
+        quality=50,
+        lossless=False,
+        save_all=True,
+        append_images=frame_list[1:],
+        duration=16,
+        loop=0,
     )
-
