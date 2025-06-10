@@ -70,7 +70,6 @@ def reformat_info(info, keys, bk2_fpath, actions):
         "level": entities_dict.get("level"),
         "subject": entities_dict.get("sub"),
         "session": entities_dict.get("ses"),
-        "repetition": entities_dict.get("run"),
         "actions": actions,
     }
 
