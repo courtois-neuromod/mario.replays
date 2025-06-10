@@ -79,10 +79,7 @@ def process_bk2_file(task, args):
         args.output_name = "replays"
 
     # Setup derivatives folder
-    if args.output is None:
-        OUTPUT_FOLDER = op.abspath(op.join(DATA_PATH, "derivatives", args.output_name))
-    else:
-        OUTPUT_FOLDER = op.abspath(op.join(args.output, args.output_name))
+    OUTPUT_FOLDER = op.abspath(op.join(args.output, args.output_name))
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
     # Make suere the game is integrated to stable-retro
@@ -238,7 +235,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o",
         "--output",
-        default=None,
+        default='outputdata/',
         type=str,
         help="Path to the derivatives folder, where the outputs will be saved.",
     )
