@@ -254,7 +254,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_variables",
         action="store_true",
-        help="Save the variables file (.npz) that contains game variables.",
+        help="Save the variables file (.json) that contains game variables.",
     )
     parser.add_argument(
         "--save_states",
