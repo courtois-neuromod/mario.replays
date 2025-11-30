@@ -11,6 +11,10 @@ import os
 import pandas as pd
 from retro.enums import State
 
+# Import general-purpose functions from cneuromod_vg_utils
+from cneuromod_vg_utils.replay import get_variables_from_replay as _get_variables_from_replay_general
+from cneuromod_vg_utils.video import make_gif, make_mp4, make_webp
+
 # ===============================
 # 🔹 GAME VARIABLES MANIPULATION
 # ===============================
@@ -24,8 +28,13 @@ def get_variables_from_replay(
     scenario=None,
     inttype=retro.data.Integrations.CUSTOM_ONLY,
 ):
-    """Replay the bk2 file and return game variables and frames."""
-    replay = replay_bk2(
+    """
+    Replay the bk2 file and return game variables and frames.
+
+    This function now uses the general-purpose implementation from cneuromod_vg_utils,
+    but adapts the output to match the original mario.replays signature (without audio).
+    """
+    repetition_variables, replay_info, replay_frames, replay_states, audio_track, audio_rate = _get_variables_from_replay_general(
         bk2_fpath,
         skip_first_step=skip_first_step,
         state=state,
@@ -33,25 +42,8 @@ def get_variables_from_replay(
         scenario=scenario,
         inttype=inttype,
     )
-    replay_frames = []
-    replay_keys = []
-    replay_info = []
-    replay_states = []
-    annotations = {}
 
-    for frame, keys, annotations, _, actions, state in replay:
-        replay_keys.append(keys)
-        replay_info.append(annotations["info"])
-        replay_frames.append(frame)
-        replay_states.append(state)
-
-    repetition_variables = reformat_info(replay_info, replay_keys, bk2_fpath, actions)
-
-    if not annotations.get("done", False):
-        logging.warning(
-            f"Done condition not satisfied for {bk2_fpath}. Consider changing skip_first_step."
-        )
-
+    # Return without audio data to maintain backwards compatibility
     return repetition_variables, replay_info, replay_frames, replay_states
 
 
@@ -185,53 +177,5 @@ def count_powerups_collected(repetition_variables):
 # ===============================
 # 🔹 FILES CREATION
 # ===============================
-
-
-def make_gif(selected_frames, movie_fname):
-    """Create a GIF file from a list of frames."""
-    frame_list = [Image.fromarray(np.uint8(img), "RGB") for img in selected_frames]
-
-    if not frame_list:
-        logging.warning(f"No frames to save in {movie_fname}")
-        return
-
-    frame_list[0].save(
-        movie_fname,
-        save_all=True,
-        append_images=frame_list[1:],
-        optimize=False,
-        duration=16,
-        loop=0,
-    )
-
-
-def make_mp4(selected_frames, movie_fname):
-    """Create an MP4 file from a list of frames."""
-    writer = skvideo.io.FFmpegWriter(
-        movie_fname, inputdict={"-r": "60"}, outputdict={"-r": "60"}
-    )
-    for frame in selected_frames:
-        im = Image.new("RGB", (frame.shape[1], frame.shape[0]), color="white")
-        im.paste(Image.fromarray(frame), (0, 0))
-        writer.writeFrame(np.array(im))
-    writer.close()
-
-
-def make_webp(selected_frames, movie_fname):
-    """Create a WebP file from a list of frames."""
-    frame_list = [Image.fromarray(np.uint8(img), "RGB") for img in selected_frames]
-
-    if not frame_list:
-        logging.warning(f"No frames to save in {movie_fname}")
-        return
-
-    frame_list[0].save(
-        movie_fname,
-        "WEBP",
-        quality=50,
-        lossless=False,
-        save_all=True,
-        append_images=frame_list[1:],
-        duration=16,
-        loop=0,
-    )
+# Video creation functions (make_gif, make_mp4, make_webp) are now imported
+# from cneuromod_vg_utils.video instead of being defined here.

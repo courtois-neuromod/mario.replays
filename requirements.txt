@@ -6,3 +6,4 @@ joblib
 pandas
 invoke
 Pillow
+cneuromod-vg-utils
