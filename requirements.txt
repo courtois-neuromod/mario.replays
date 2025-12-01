@@ -6,4 +6,4 @@ joblib
 pandas
 invoke
 Pillow
-cneuromod-vg-utils
+git+https://github.com/courtois-neuromod/videogames.utils.git
