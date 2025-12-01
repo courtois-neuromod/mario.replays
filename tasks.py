@@ -208,17 +208,30 @@ def setup_env(c, compute_canada=False):
     ```
     """
     print("🐍 Setting up mario.replays environment...")
+    print("📦 Installing required packages...")
 
-    setup_env_python(c)
-    c.run("python -m venv env")
-    c.run("source env/bin/activate")
-    c.run("pip install -e .")
+    env_setup_lines = [
+        "set -e",
+        "python -m venv env",
+        "source env/bin/activate",
+        "which python",
+        "pip install -r requirements.txt",
+        "pip install -e .",
+    ]
+
     if compute_canada:
         print("📦 Building stable-retro from source for Compute Canada...")
-        c.run("git clone https://github.com/FaramaFoundation/stable-retro.git", warn=True)
-        c.run("pip install -e stable-retro")
+        env_setup_lines.extend(
+            [
+                "git clone https://github.com/FaramaFoundation/stable-retro.git || true",
+                "pip install -e stable-retro",
+            ]
+        )
 
-    c.run("deactivate")
+    env_setup_lines.append("deactivate")
+
+    c.run("\n".join(env_setup_lines), pty=True)
+
     print("✅ Environment setup complete!")
 
 
