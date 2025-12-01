@@ -104,7 +104,7 @@ def create_replays(
     # Build command
     cmd = [
         "python",
-        "code/mario_replays/create_replays/create_replays.py",
+        "src/mario_replays/create_replays/create_replays.py",
         "--datapath", datapath,
         "--output", output,
         "--n_jobs", str(n_jobs),
