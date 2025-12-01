@@ -97,7 +97,7 @@ outputdata/replays/
 ## Available Tasks
 
 ```bash
-invoke --list                    # View all tasks
+invoke --list                   # View all tasks
 invoke setup-env                # Install dependencies
 invoke setup-mario-dataset      # Download dataset via Datalad
 invoke create-replays           # Process replay files
