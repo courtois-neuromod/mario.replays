@@ -84,7 +84,7 @@ def process_bk2_file(task, args):
 
     # Make suere the game is integrated to stable-retro
     if args.stimuli is None:
-        STIMULI_PATH = op.abspath(op.join(DATA_PATH, "stimuli"))
+        STIMULI_PATH = op.abspath(op.join(DATA_PATH, "mario.stimuli"))
     else:
         STIMULI_PATH = op.abspath(args.stimuli)
     logging.debug(f"Adding stimuli path: {STIMULI_PATH}")
@@ -107,9 +107,6 @@ def process_bk2_file(task, args):
     if op.exists(json_sidecar_fname):
         logging.info(f"Already processed: {json_sidecar_fname}")
         return
-    else:
-        os.makedirs(os.path.dirname(json_sidecar_fname), exist_ok=True)
-
     logging.info(f"Processing: {bk2_path}")
 
     entities = bk2_file.split("/")[-1].split(".")[0]
