@@ -7,3 +7,4 @@ pandas
 invoke
 Pillow
 git+https://github.com/courtois-neuromod/videogames.utils.git
+airoh

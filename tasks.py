@@ -26,6 +26,7 @@ def create_replays(
     save_videos=False,
     save_variables=True,
     save_ramdumps=False,
+    save_confs=False,
     simple=False,
     verbose=False,
 ):
@@ -56,6 +57,8 @@ def create_replays(
         Save game variables (.json). Default: True.
     save_ramdumps : bool, optional
         Save RAM dumps (.npz). Default: False.
+    save_confs : bool, optional
+        Save psychophysical confounds (.npy). Default: False.
     simple : bool, optional
         Use simplified game version. Default: False.
     verbose : bool, optional
@@ -121,6 +124,9 @@ def create_replays(
 
     if save_ramdumps:
         cmd.append("--save_ramdumps")
+
+    if save_confs:
+        cmd.append("--save_confs")
 
     if simple:
         cmd.append("--simple")

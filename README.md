@@ -18,6 +18,7 @@ For each `.bk2` replay file:
 
 3. **Video replay** (optional) - MP4 with audio
 4. **RAM dumps** (optional) - Complete memory state per frame
+5. **Psychophysical confounds** (optional) - Luminance, optical flow, and audio envelope
 
 ## Quick Start
 
@@ -47,6 +48,9 @@ invoke create-replays
 # Include videos and use parallel processing
 invoke create-replays --save-videos --n-jobs 8
 
+# Include psychophysical confounds
+invoke create-replays --save-confs
+
 # Custom paths
 invoke create-replays \
   --datapath /data/mario \
@@ -60,6 +64,7 @@ python code/mario_replays/create_replays/create_replays.py \
   --datapath sourcedata/mario \
   --output outputdata/replays \
   --save_variables \
+  --save_confs \
   --n_jobs -1
 ```
 
@@ -79,6 +84,7 @@ output_dir: outputdata/replays
 n_jobs: -1              # Use all CPU cores
 save_videos: false
 save_variables: true
+save_confs: false
 ```
 
 ## Output Structure
@@ -91,7 +97,8 @@ outputdata/replays/
             ├── infos/       # JSON summary files
             ├── variables/   # Game variables
             ├── videos/      # MP4 replays (optional)
-            └── ramdumps/    # RAM states (optional)
+            ├── ramdumps/    # RAM states (optional)
+            └── confs/       # Psychophysical confounds (optional)
 ```
 
 ## Available Tasks
@@ -111,6 +118,7 @@ invoke create-replays           # Process replay files
 - `--save-videos` - Generate MP4 files
 - `--save-variables` - Save game variables (default: true)
 - `--save-ramdumps` - Save RAM dumps
+- `--save-confs` - Save psychophysical confounds (luminance, optical flow, audio envelope)
 - `--verbose` - Detailed logging
 
 ## Data Format

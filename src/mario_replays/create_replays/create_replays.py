@@ -21,6 +21,11 @@ from tqdm_joblib import tqdm_joblib
 from tqdm import tqdm
 import logging
 from mario_replays.utils import make_mp4, create_sidecar_dict, get_variables_from_replay
+from cneuromod_vg_utils.psychophysics import (
+    compute_luminance,
+    compute_optical_flow,
+    audio_envelope_per_frame,
+)
 
 
 def _extract_subject_from_bk2(bk2_file):
@@ -101,12 +106,13 @@ def _build_output_paths(output_folder, bk2_file, subject, session):
         "ramdump": op.join(beh_folder, "ramdumps", f"{entities}.npz"),
         "json": op.join(beh_folder, "infos", f"{entities}.json"),
         "variables": op.join(beh_folder, "variables", f"{entities}.json"),
+        "confs": op.join(beh_folder, "confs", f"{entities}_confs.npy"),
         "entities": entities
     }
 
 
-def _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables):
-    """Save video, ramdump, and variables files if requested."""
+def _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables, audio_track=None, audio_rate=None):
+    """Save video, ramdump, variables, and confounds files if requested."""
     if args.save_videos:
         os.makedirs(os.path.dirname(paths["mp4"]), exist_ok=True)
         make_mp4(replay_frames, paths["mp4"])
@@ -121,6 +127,29 @@ def _save_optional_outputs(args, paths, replay_frames, replay_states, repetition
         os.makedirs(os.path.dirname(paths["variables"]), exist_ok=True)
         with open(paths["variables"], "w") as f:
             json.dump(repetition_variables, f)
+
+    if args.save_confs:
+        if audio_track is None or audio_rate is None:
+            logging.warning(f"Cannot save confounds: audio data not available")
+            return
+        os.makedirs(os.path.dirname(paths["confs"]), exist_ok=True)
+        # Compute psychophysical confounds (luminance, optical flow, audio envelope)
+        luminance = compute_luminance(replay_frames)
+        optical_flow = compute_optical_flow(replay_frames)
+        audio_envelope = audio_envelope_per_frame(
+            audio_track,
+            sample_rate=audio_rate,
+            frame_rate=60.0,
+            frame_count=len(replay_frames),
+        )
+
+        confounds_dict = {
+            "luminance": luminance,
+            "optical_flow": optical_flow,
+            "audio_envelope": audio_envelope,
+        }
+        np.save(paths["confs"], confounds_dict)
+        logging.info(f"Confounds saved to: {paths['confs']}")
 
 
 def _create_and_save_sidecar(repetition_variables, task_metadata, paths):
@@ -156,7 +185,7 @@ def process_bk2_file(task, args):
     """
     _setup_game_config(args)
     data_path = op.abspath(args.datapath)
-    output_folder = op.abspath(op.join(args.output, args.output_name))
+    output_folder = op.abspath(args.output)
     os.makedirs(output_folder, exist_ok=True)
     _setup_stimuli_path(args, data_path)
 
@@ -174,14 +203,28 @@ def process_bk2_file(task, args):
     logging.info(f"Processing: {bk2_path}")
     paths = _build_output_paths(output_folder, bk2_file, subject, session)
 
-    repetition_variables, _, replay_frames, replay_states = get_variables_from_replay(
-        op.join(data_path, bk2_file),
-        skip_first_step=(idx_in_run == 0),
-        game=args.game_name,
-        inttype=retro.data.Integrations.CUSTOM_ONLY,
-    )
+    # Get audio data if we need to save confounds
+    return_audio = args.save_confs if hasattr(args, 'save_confs') else False
 
-    _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables)
+    if return_audio:
+        repetition_variables, _, replay_frames, replay_states, audio_track, audio_rate = get_variables_from_replay(
+            op.join(data_path, bk2_file),
+            skip_first_step=(idx_in_run == 0),
+            game=args.game_name,
+            inttype=retro.data.Integrations.CUSTOM_ONLY,
+            return_audio=True,
+        )
+    else:
+        repetition_variables, _, replay_frames, replay_states = get_variables_from_replay(
+            op.join(data_path, bk2_file),
+            skip_first_step=(idx_in_run == 0),
+            game=args.game_name,
+            inttype=retro.data.Integrations.CUSTOM_ONLY,
+        )
+        audio_track = None
+        audio_rate = None
+
+    _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables, audio_track, audio_rate)
 
     task_metadata = {
         "idx_in_run": idx_in_run, "run": run, "global_idx": global_idx,
@@ -335,6 +378,11 @@ if __name__ == "__main__":
         "--save_ramdumps",
         action="store_true",
         help="Save RAM dumps at each frame into a *_ramdumps.npy file.",
+    )
+    parser.add_argument(
+        "--save_confs",
+        action="store_true",
+        help="Save psychophysical confounds (luminance, optical flow, audio envelope) into a *_confs.npy file.",
     )
     parser.add_argument(
         "--simple",

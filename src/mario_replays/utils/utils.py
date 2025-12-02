@@ -16,6 +16,7 @@ def get_variables_from_replay(
     game=None,
     scenario=None,
     inttype=retro.data.Integrations.CUSTOM_ONLY,
+    return_audio=False,
 ):
     """
     Replay a bk2 file and extract game variables and frames.
@@ -30,16 +31,22 @@ def get_variables_from_replay(
         game: Game name (inferred if None)
         scenario: Emulator scenario
         inttype: Integration type
+        return_audio: If True, return audio data (default: False for backwards compatibility)
 
     Returns:
-        Tuple of (repetition_variables, replay_info, replay_frames, replay_states)
+        If return_audio=False: Tuple of (repetition_variables, replay_info, replay_frames, replay_states)
+        If return_audio=True: Tuple of (repetition_variables, replay_info, replay_frames, replay_states, audio_track, audio_rate)
     """
     result = _get_variables_from_replay_general(
         bk2_fpath, skip_first_step=skip_first_step, state=state,
         game=game, scenario=scenario, inttype=inttype
     )
-    repetition_variables, replay_info, replay_frames, replay_states, _, _ = result
-    return repetition_variables, replay_info, replay_frames, replay_states
+    repetition_variables, replay_info, replay_frames, replay_states, audio_track, audio_rate = result
+
+    if return_audio:
+        return repetition_variables, replay_info, replay_frames, replay_states, audio_track, audio_rate
+    else:
+        return repetition_variables, replay_info, replay_frames, replay_states
 
 
 def _extract_entities_from_filename(filename):
