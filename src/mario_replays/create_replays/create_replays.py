@@ -16,6 +16,7 @@ import retro
 import pandas as pd
 import json
 import numpy as np
+import gc
 from joblib import Parallel, delayed
 from tqdm_joblib import tqdm_joblib
 from tqdm import tqdm
@@ -96,6 +97,33 @@ def _validate_bk2_file(bk2_file, bk2_path):
     return True
 
 
+def _check_outputs_exist(paths, args):
+    """
+    Check which output files already exist.
+
+    Returns:
+        tuple: (all_exist, missing_outputs) where all_exist is bool and
+               missing_outputs is list of output types that need to be generated
+    """
+    missing = []
+
+    # JSON is always required
+    if not op.exists(paths["json"]):
+        missing.append("json")
+
+    # Check optional outputs
+    if args.save_videos and not op.exists(paths["mp4"]):
+        missing.append("mp4")
+    if args.save_ramdumps and not op.exists(paths["ramdump"]):
+        missing.append("ramdump")
+    if args.save_variables and not op.exists(paths["variables"]):
+        missing.append("variables")
+    if hasattr(args, 'save_confs') and args.save_confs and not op.exists(paths["confs"]):
+        missing.append("confs")
+
+    return len(missing) == 0, missing
+
+
 def _build_output_paths(output_folder, bk2_file, subject, session):
     """Build all output file paths for replay processing."""
     entities = bk2_file.split("/")[-1].split(".")[0]
@@ -111,11 +139,11 @@ def _build_output_paths(output_folder, bk2_file, subject, session):
     }
 
 
-def _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables, audio_track=None, audio_rate=None):
+def _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables, audio_track, audio_rate):
     """Save video, ramdump, variables, and confounds files if requested."""
     if args.save_videos:
         os.makedirs(os.path.dirname(paths["mp4"]), exist_ok=True)
-        make_mp4(replay_frames, paths["mp4"])
+        make_mp4(replay_frames, paths["mp4"], audio=audio_track, sample_rate=audio_rate)
         logging.info(f"Video saved to: {paths['mp4']}")
 
     if args.save_ramdumps:
@@ -129,9 +157,6 @@ def _save_optional_outputs(args, paths, replay_frames, replay_states, repetition
             json.dump(repetition_variables, f)
 
     if args.save_confs:
-        if audio_track is None or audio_rate is None:
-            logging.warning(f"Cannot save confounds: audio data not available")
-            return
         os.makedirs(os.path.dirname(paths["confs"]), exist_ok=True)
         # Compute psychophysical confounds (luminance, optical flow, audio envelope)
         luminance = compute_luminance(replay_frames)
@@ -187,6 +212,7 @@ def process_bk2_file(task, args):
     data_path = op.abspath(args.datapath)
     output_folder = op.abspath(args.output)
     os.makedirs(output_folder, exist_ok=True)
+    # Set up stimuli path in each worker process for parallel processing
     _setup_stimuli_path(args, data_path)
 
     bk2_file, run, idx_in_run, phase, subject, session, level, global_idx, level_idx = task
@@ -195,34 +221,24 @@ def process_bk2_file(task, args):
     if not _validate_bk2_file(bk2_file, bk2_path):
         return
 
-    json_check_path = op.join(output_folder, bk2_file.replace(".bk2", ".json"))
-    if op.exists(json_check_path):
-        logging.info(f"Already processed: {json_check_path}")
-        return
-
-    logging.info(f"Processing: {bk2_path}")
     paths = _build_output_paths(output_folder, bk2_file, subject, session)
 
-    # Get audio data if we need to save confounds
-    return_audio = args.save_confs if hasattr(args, 'save_confs') else False
-
-    if return_audio:
-        repetition_variables, _, replay_frames, replay_states, audio_track, audio_rate = get_variables_from_replay(
-            op.join(data_path, bk2_file),
-            skip_first_step=(idx_in_run == 0),
-            game=args.game_name,
-            inttype=retro.data.Integrations.CUSTOM_ONLY,
-            return_audio=True,
-        )
+    # Check if all required outputs already exist - skip if so
+    all_exist, missing_outputs = _check_outputs_exist(paths, args)
+    if all_exist:
+        logging.info(f"Skipping (all outputs exist): {paths['entities']}")
+        return
     else:
-        repetition_variables, _, replay_frames, replay_states = get_variables_from_replay(
-            op.join(data_path, bk2_file),
-            skip_first_step=(idx_in_run == 0),
-            game=args.game_name,
-            inttype=retro.data.Integrations.CUSTOM_ONLY,
-        )
-        audio_track = None
-        audio_rate = None
+        logging.info(f"Processing {paths['entities']} (missing: {', '.join(missing_outputs)})")
+
+    # Always get audio data (needed for videos and confounds)
+    repetition_variables, _, replay_frames, replay_states, audio_track, audio_rate = get_variables_from_replay(
+        op.join(data_path, bk2_file),
+        skip_first_step=(idx_in_run == 0),
+        game=args.game_name,
+        inttype=retro.data.Integrations.CUSTOM_ONLY,
+        return_audio=True,
+    )
 
     _save_optional_outputs(args, paths, replay_frames, replay_states, repetition_variables, audio_track, audio_rate)
 
@@ -232,11 +248,44 @@ def process_bk2_file(task, args):
     }
     _create_and_save_sidecar(repetition_variables, task_metadata, paths)
 
+    # Explicitly clear large data structures to free memory
+    del replay_frames
+    del replay_states
+    del repetition_variables
+    if audio_track is not None:
+        del audio_track
+    # Force garbage collection to release memory immediately
+    gc.collect()
 
-def _configure_logging(verbose):
+
+def _configure_logging(verbose, log_file=None):
     """Set up logging configuration."""
     level = logging.INFO if verbose else logging.WARNING
-    logging.basicConfig(level=level, format="%(message)s")
+
+    # Set up handlers
+    handlers = []
+
+    # Console handler (always present)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(logging.Formatter("%(message)s"))
+    handlers.append(console_handler)
+
+    # File handler (optional)
+    if log_file:
+        # Use buffering=1 for line buffering to write immediately
+        file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+        file_handler.setLevel(logging.INFO)  # Always log INFO to file
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        handlers.append(file_handler)
+        print(f"Logging to file: {log_file}")
+
+    logging.basicConfig(level=level, format="%(message)s", handlers=handlers, force=True)
+
+    # Ensure immediate flushing for all handlers
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, logging.FileHandler):
+            handler.flush()
 
 
 def _determine_phase(events_dataframe):
@@ -311,8 +360,11 @@ def main(args):
     Args:
         args: Parsed command-line arguments
     """
-    _configure_logging(args.verbose)
+    _configure_logging(args.verbose, args.log_file if hasattr(args, 'log_file') else None)
     data_path = op.abspath(args.datapath)
+
+    # Set up stimuli path once before parallel processing to avoid race conditions
+    _setup_stimuli_path(args, data_path)
 
     bk2_list = _collect_all_bk2_files(data_path)
     bk2_df = pd.DataFrame(bk2_list)
@@ -322,6 +374,8 @@ def main(args):
     logging.info(f"Found {len(tasks)} bk2 files to process.")
 
     n_jobs = os.cpu_count() if args.n_jobs == -1 else args.n_jobs
+    logging.info(f"Using {n_jobs} parallel jobs")
+
     if n_jobs != 1:
         _run_parallel_processing(tasks, args)
     else:
@@ -395,6 +449,12 @@ if __name__ == "__main__":
         "--verbose",
         action="store_true",
         help="Display verbose output.",
+    )
+    parser.add_argument(
+        "--log-file",
+        type=str,
+        default=None,
+        help="Path to log file for detailed timing and progress information.",
     )
 
     args = parser.parse_args()
