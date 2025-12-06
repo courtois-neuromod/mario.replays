@@ -60,12 +60,36 @@ invoke create-replays \
 ### Direct Python Script
 
 ```bash
-python code/mario_replays/create_replays/create_replays.py \
+python src/mario_replays/create_replays/create_replays.py \
   --datapath sourcedata/mario \
   --output outputdata/replays \
   --save_variables \
   --save_confs \
   --n_jobs -1
+```
+
+## Processing Specific Subjects/Sessions
+
+You can filter processing to specific subjects and sessions:
+
+```bash
+# Process only sub-01 and sub-02
+invoke create-replays --subjects "sub-01 sub-02"
+
+# Process only session 001
+invoke create-replays --sessions "ses-001"
+
+# Combine filters
+invoke create-replays \
+  --subjects "sub-01 sub-02" \
+  --sessions "ses-001 ses-002"
+
+# Direct Python script
+python src/mario_replays/create_replays/create_replays.py \
+  --datapath sourcedata/mario \
+  --subjects sub-01 sub-02 \
+  --sessions ses-001 \
+  --save_variables
 ```
 
 ## Requirements
@@ -119,6 +143,8 @@ invoke create-replays           # Process replay files
 - `--save-variables` - Save game variables (default: true)
 - `--save-ramdumps` - Save RAM dumps
 - `--save-confs` - Save psychophysical confounds (luminance, optical flow, audio envelope)
+- `--subjects` - Space-separated subject IDs (e.g., "sub-01 sub-02")
+- `--sessions` - Space-separated session IDs (e.g., "ses-001 ses-002")
 - `--verbose` - Detailed logging
 
 ## Data Format

@@ -29,6 +29,8 @@ def create_replays(
     save_confs=False,
     simple=False,
     verbose=False,
+    subjects=None,
+    sessions=None,
 ):
     """
     Process Mario dataset replay files and extract game data.
@@ -63,6 +65,12 @@ def create_replays(
         Use simplified game version. Default: False.
     verbose : bool, optional
         Enable verbose output. Default: False.
+    subjects : str, optional
+        Space-separated subject IDs to process (e.g., "sub-01 sub-02").
+        If None, processes all subjects.
+    sessions : str, optional
+        Space-separated session IDs to process (e.g., "ses-001 ses-002").
+        If None, processes all sessions.
 
     Examples
     --------
@@ -82,6 +90,11 @@ def create_replays(
       --datapath /data/mario \
       --output /data/derivatives/replays \
       --n-jobs 8
+    ```
+
+    Process specific subjects and sessions:
+    ```bash
+    invoke create-replays --subjects "sub-01 sub-02" --sessions "ses-001"
     ```
     """
     # Resolve paths from configuration or arguments
@@ -134,6 +147,12 @@ def create_replays(
     if verbose:
         cmd.append("--verbose")
 
+    if subjects:
+        cmd.extend(["--subjects", subjects])
+
+    if sessions:
+        cmd.extend(["--sessions", sessions])
+
     # Display execution info
     print("🎮 Processing Mario replays...")
     print(f"   Dataset: {datapath}")
@@ -141,6 +160,10 @@ def create_replays(
     print(f"   Parallel jobs: {n_jobs}")
     print(f"   Save videos: {save_videos}")
     print(f"   Save variables: {save_variables}")
+    if subjects:
+        print(f"   Subjects: {subjects}")
+    if sessions:
+        print(f"   Sessions: {sessions}")
     print()
 
     # Run the processing script

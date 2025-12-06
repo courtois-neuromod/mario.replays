@@ -325,12 +325,40 @@ def _collect_bk2_info_from_events(run_events_file):
     return bk2_list
 
 
-def _collect_all_bk2_files(data_path):
-    """Walk dataset and collect all bk2 file information."""
+def _collect_all_bk2_files(data_path, subjects=None, sessions=None):
+    """
+    Walk dataset and collect all bk2 file information.
+
+    Parameters
+    ----------
+    data_path : str
+        Path to the mario dataset root directory
+    subjects : list of str, optional
+        List of subject IDs to process (e.g., ['sub-01', 'sub-02']).
+        If None, processes all subjects.
+    sessions : list of str, optional
+        List of session IDs to process (e.g., ['ses-001', 'ses-002']).
+        If None, processes all sessions.
+
+    Returns
+    -------
+    list
+        List of dicts containing bk2 file information
+    """
     bk2_list = []
     for root, _, files in sorted(os.walk(data_path)):
         for file in files:
             if "events.tsv" in file and "annotated" not in file:
+                # Check if this file matches subject filter
+                if subjects is not None:
+                    if not any(sub in root for sub in subjects):
+                        continue
+
+                # Check if this file matches session filter
+                if sessions is not None:
+                    if not any(ses in root for ses in sessions):
+                        continue
+
                 run_events_file = op.join(root, file)
                 bk2_list.extend(_collect_bk2_info_from_events(run_events_file))
     return bk2_list
@@ -366,7 +394,16 @@ def main(args):
     # Set up stimuli path once before parallel processing to avoid race conditions
     _setup_stimuli_path(args, data_path)
 
-    bk2_list = _collect_all_bk2_files(data_path)
+    # Get subject/session filters if provided
+    subjects = getattr(args, 'subjects', None)
+    sessions = getattr(args, 'sessions', None)
+
+    if subjects:
+        logging.info(f"Filtering subjects: {', '.join(subjects)}")
+    if sessions:
+        logging.info(f"Filtering sessions: {', '.join(sessions)}")
+
+    bk2_list = _collect_all_bk2_files(data_path, subjects=subjects, sessions=sessions)
     bk2_df = pd.DataFrame(bk2_list)
     bk2_df = get_passage_order(bk2_df)
 
@@ -455,6 +492,20 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Path to log file for detailed timing and progress information.",
+    )
+    parser.add_argument(
+        "--subjects",
+        "-sub",
+        nargs="+",
+        default=None,
+        help="List of subjects to process (e.g., sub-01 sub-02). If not specified, all subjects are processed.",
+    )
+    parser.add_argument(
+        "--sessions",
+        "-ses",
+        nargs="+",
+        default=None,
+        help="List of sessions to process (e.g., ses-001 ses-002). If not specified, all sessions are processed.",
     )
 
     args = parser.parse_args()
