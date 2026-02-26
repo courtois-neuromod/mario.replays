@@ -26,12 +26,15 @@ For each `.bk2` replay file:
 # Install
 git clone git@github.com:courtois-neuromod/mario.replays
 cd mario.replays
-pip install -r requirements.txt
 pip install -e .
 
-# Or with airoh
-pip install airoh
+# Or with airoh (Recommended)
+pip install airoh invoke
 invoke setup-env
+
+# Download the cneuromod mario dataset
+# For more infomation: https://docs.cneuromod.ca/en/latest/ACCESS.html
+invoke setup-mario-dataset
 
 # Process replays
 invoke create-replays

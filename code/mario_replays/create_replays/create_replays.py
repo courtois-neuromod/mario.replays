@@ -12,7 +12,7 @@ Usage:
 import argparse
 import os
 import os.path as op
-import retro
+import stable_retro as retro
 import pandas as pd
 import json
 import numpy as np
@@ -22,7 +22,7 @@ from tqdm_joblib import tqdm_joblib
 from tqdm import tqdm
 import logging
 from mario_replays.utils import make_mp4, create_sidecar_dict, get_variables_from_replay
-from cneuromod_vg_utils.psychophysics import (
+from videogames_utils.psychophysics import (
     compute_luminance,
     compute_optical_flow,
     audio_envelope_per_frame,

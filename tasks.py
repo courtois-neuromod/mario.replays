@@ -46,7 +46,7 @@ def create_replays(
     c : invoke.Context
         The Invoke context (automatically provided).
     datapath : str, optional
-        Path to the mario dataset root. Defaults to mario_dataset from invoke.yaml.
+        Path to the mario dataset root. Defaults to sourcedata/mario from invoke.yaml.
     stimuli : str, optional
         Path to stimuli files. Defaults to stimuli_path from invoke.yaml.
     output : str, optional

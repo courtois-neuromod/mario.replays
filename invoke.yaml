@@ -2,7 +2,7 @@
 # All values can be overridden via command-line flags
 
 # Dataset paths
-mario_dataset: ../mario          # Path to mario dataset root
+mario_dataset: sourcedata/mario         # Path to mario dataset root
 stimuli_path: null               # Path to stimuli (defaults to {mario_dataset}/stimuli)
 output_dir: ./   # Output directory for derivatives
 

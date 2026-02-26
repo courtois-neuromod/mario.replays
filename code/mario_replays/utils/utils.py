@@ -1,12 +1,12 @@
 """Utility functions for Mario replay processing."""
 
-import retro
+import stable_retro as retro
 import os.path as op
 import numpy as np
-from retro.enums import State
+from stable_retro.enums import State
 
-from cneuromod_vg_utils.replay import get_variables_from_replay as _get_variables_from_replay_general
-from cneuromod_vg_utils.video import make_gif, make_mp4, make_webp
+from videogames_utils.replay import get_variables_from_replay as _get_variables_from_replay_general
+from videogames_utils.video import make_gif, make_mp4, make_webp
 
 
 def get_variables_from_replay(
